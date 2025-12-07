@@ -1,0 +1,146 @@
+<?php
+
+namespace app\controllers;
+
+use app\helpers\ResponseFormatter;
+use app\models\Forum;
+use app\models\ForumRespond;
+
+class ForumRespondController {
+    public function index($slug, $forumId) {
+        $respondModel = new ForumRespond();
+
+        // 1. Ambil Jawaban Utama
+        $answers = $respondModel->getAnswersByForumId($forumId);
+
+        // 2. Format Data (Foto Profil & Ambil Replies)
+        $config = require BASE_PATH . '/config/app.php';
+
+        $formattedAnswers = array_map(function($ans) use ($respondModel, $config) {
+            $ans['profile_picture_url'] = $ans['profile_picture'] ? $config['storage_url'] . $ans['profile_picture'] : null;
+
+            // Ambil Komentar/Reply untuk jawaban ini (Nested)
+            $replies = $respondModel->getRepliesByParentId($ans['id']);
+            $ans['replies'] = array_map(function($r) use ($config) {
+                $r['profile_picture_url'] = $r['profile_picture'] ? $config['storage_url'] . $r['profile_picture'] : null;
+                return $r;
+            }, $replies);
+
+            return $ans;
+        }, $answers);
+
+        ResponseFormatter::success($formattedAnswers, "Answers fetched");
+    }
+
+    public function store($slug, $forumId) {
+        $data = $_POST;
+        if (empty($data['message'])) {
+            ResponseFormatter::error("Message cannot be empty", 400);
+        }
+
+        // parent_id opsional. Jika null = Answer, Jika isi = Reply
+        $parentId = $data['parent_id'] == 'null' ? null : $data['parent_id'];
+
+        $respondModel = new ForumRespond();
+        $id = $respondModel->create(
+            $_SESSION['user_id'],
+            $forumId,
+            $data['message'],
+            $parentId
+        );
+
+        if ($id) {
+            ResponseFormatter::success(['id' => $id], "Response added");
+        } else {
+            ResponseFormatter::error("Failed", 500);
+        }
+    }
+
+    public function markAccepted($slug, $forumId, $respondId) {
+        $forumModel = new Forum();
+        $forum = $forumModel->findById($forumId);
+
+        if (!$forum) ResponseFormatter::error("Forum not found", 404);
+
+        // PERMISSION CHECK:
+        // Siapa yang boleh menandai solusi?
+        // Biasanya hanya PEMBUAT PERTANYAAN (User ID di tabel forum)
+        if ($forum['user_id'] != $_SESSION['user_id']) {
+            ResponseFormatter::error("Only the question author can mark the solution", 403);
+        }
+
+        $respondModel = new ForumRespond();
+        // Cek apakah respond ini milik forum ini (Security)
+        $respond = $respondModel->findById($respondId);
+        if (!$respond || $respond['forum_id'] != $forumId) {
+            ResponseFormatter::error("Invalid answer ID", 400);
+        }
+
+        if ($respondModel->markAsAccepted($respondId, $forumId)) {
+            ResponseFormatter::success(null, "Answer marked as solution");
+        } else {
+            ResponseFormatter::error("Failed to mark solution", 500);
+        }
+    }
+
+    public function storeReply($forumRespondId) {
+        $data = $_POST;
+
+        if (!isset($data['message'])) {
+            ResponseFormatter::error('Incomplete data', 400);
+        }
+
+        $forumRespondModel = new ForumRespond();
+        $forumRespondData = $forumRespondModel->findById($forumRespondId);
+        if (!$forumRespondData) {
+            ResponseFormatter::error('Forum respond not found', 404);
+        }
+        $dataForumRespond = [
+            'forum_id' => $forumRespondData['forum_id'],
+            'user_id' => $_SESSION['user_id'],
+            'message' => strip_tags($data['message']),
+            'parent_id' => $forumRespondId
+        ];
+
+        $forumRespond = $forumRespondModel->create($dataForumRespond);
+        if (!$forumRespond) {
+            ResponseFormatter::error('Failed to create forum respond', 500);
+        }
+        ResponseFormatter::success(null, 'Forum respond created successfully');
+    }
+
+    public function update($forumRespondId) {
+        $data = $_POST;
+
+        if (!isset($data['message'])) {
+            ResponseFormatter::error('Incomplete data', 400);
+        }
+
+        $forumRespondModel = new ForumRespond();
+        $forumRespondData = $forumRespondModel->findById($forumRespondId);
+        if (!$forumRespondData) {
+            ResponseFormatter::error('Forum respond not found', 404);
+        }
+        $dataForumRespond = [
+            'message' => strip_tags($data['message'])
+        ];
+        $updateForumRespond = $forumRespondModel->update($forumRespondId, $dataForumRespond);
+        if (!$updateForumRespond) {
+            ResponseFormatter::error('Failed to update forum respond', 500);
+        }
+        ResponseFormatter::success(null, 'Forum respond updated successfully');
+    }
+
+    public function delete($forumRespondId) {
+        $forumRespondModel = new ForumRespond();
+        $forumRespondData = $forumRespondModel->findById($forumRespondId);
+        if (!$forumRespondData) {
+            ResponseFormatter::error('Forum respond not found', 404);
+        }
+        $deleteForumRespond = $forumRespondModel->delete($forumRespondId);
+        if (!$deleteForumRespond) {
+            ResponseFormatter::error('Failed to delete forum respond', 500);
+        }
+        ResponseFormatter::success(null, 'Forum respond deleted successfully');
+    }
+}

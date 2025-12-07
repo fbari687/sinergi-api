@@ -1,0 +1,427 @@
+<?php
+
+namespace app\controllers;
+
+use app\core\Database;
+use app\helpers\MailHelper;
+use app\helpers\ResponseFormatter;
+use app\models\AccountRequest;
+use app\models\Notification;
+use app\models\Otp;
+use app\models\User;
+use app\models\UserProfile;
+
+// <-- TAMBAHAN: Import Model UserProfile
+
+class AuthController
+{
+    public function requestOtp()
+    {
+        $data = $_POST;
+
+        if (!isset($data['username']) || !isset($data['email']) || !isset($data['password'])) {
+            ResponseFormatter::error('Incomplete data', 400);
+        }
+
+        $config = require BASE_PATH . '/config/app.php';
+        $allowedDomains = $config['allowed_email_domains'];
+
+        $email = $data['email'];
+        $emailParts = explode("@", $email);
+        $domain = end($emailParts);
+
+        if (!in_array(strtolower($domain), $allowedDomains)) {
+            ResponseFormatter::error('Email domain not allowed', 400);
+        }
+
+        if (strlen($data['password']) < 8) {
+            ResponseFormatter::error('Password must be at least 8 characters long', 400);
+        }
+
+        // Cek apakah email sudah terdaftar
+        $userModel = new User();
+        if ($userModel->findByEmail($data['email'])) {
+            ResponseFormatter::error('Email already exists.', 409);
+        }
+
+        // Generate OTP
+        $otpCode = rand(100000, 999999);
+
+        $otpModel = new Otp();
+        $otpModel->create($data['email'], $otpCode);
+
+        // FUNGSI MENGIRIMKAN EMAIL (saya matikan sementara)
+        $emailSent = MailHelper::sendOtp($data['email'], $data['username'], $otpCode);
+
+        if (!$emailSent) {
+            ResponseFormatter::error('Failed to send email', 500);
+        }
+
+        $_SESSION['registration_data'] = [
+            'username' => strip_tags($data['username']),
+            'email' => strip_tags($data['email']),
+            'password' => strip_tags($data['password'])
+        ];
+
+        ResponseFormatter::success(null, 'OTP has been sent to your email');
+    }
+
+    public function verifyOtp()
+    {
+        $data = $_POST;
+
+        if (!isset($data['email']) || !isset($data['otp_code'])) {
+            ResponseFormatter::error('Email and OTP code are required', 400);
+        }
+
+        if (!isset($_SESSION['registration_data']) || $_SESSION['registration_data']['email'] !== $data['email']) {
+            ResponseFormatter::error('No Registration process started for this email', 400);
+        }
+
+        $otpModel = new Otp();
+        $otpData = $otpModel->findByEmail($data['email']);
+
+        if (!$otpData || $otpData['otp_code'] !== $data['otp_code']) {
+            ResponseFormatter::error('Invalid OTP Code', 400);
+        }
+
+        if (time() > $otpData['expires_at']) {
+            ResponseFormatter::error('OTP Code has expired', 400);
+        }
+
+        $registrationData = $_SESSION['registration_data'];
+
+        $this->registerUser($registrationData['username'], $registrationData['email'], $registrationData['password']);
+    }
+
+    private function registerUser($username, $email, $password)
+    {
+        $bio = "No bio yet.";
+        $profilePicture = "uploads/profile_picture/unknown.png";
+
+        $emailParts = explode("@", $email);
+        $nameParts = explode(".", reset($emailParts));
+        $domain = end($emailParts);
+
+        if ($domain === "stu.pnj.ac.id") {
+            array_pop($nameParts);
+            $role = "Mahasiswa";
+        } else {
+            $role = "Dosen";
+        }
+
+        $fullname = ucwords(implode(" ", $nameParts));
+
+        $userModel = new User();
+        // Gunakan akses array di sini juga
+        $userId = $userModel->create($fullname, $username, $bio, $email, $password, $profilePicture, $role);
+
+        if ($userId) {
+            $otpModel = new Otp();
+            $otpModel->deleteByEmail($email);
+            unset($_SESSION['registration_data']);
+            ResponseFormatter::success(null, 'User registered successfully');
+        } else {
+            ResponseFormatter::error('Failed to register user', 500);
+        }
+    }
+
+    public function me()
+    {
+        $userModel = new User();
+        $user = $userModel->findById($_SESSION['user_id']);
+        // --- LOGIKA CEK PROFILE (BARU) ---
+        $userProfileModel = new UserProfile();
+
+        // Mengambil nama role dari hasil query user (User.php: r.name AS role)
+        $roleName = $user['role'] ?? '';
+
+        // Cek apakah user ini sudah punya data di tabel profiles (mahasiswa_profiles / dosen_profiles)
+        $isProfileComplete = $userProfileModel->hasProfile($user['id'], $roleName);
+
+        // Masukkan status ke dalam array user agar Frontend tahu harus menampilkan dialog atau tidak
+        $user['is_profile_complete'] = $isProfileComplete;
+        $config = require BASE_PATH . '/config/app.php';
+        $storageBaseUrl = $config['storage_url'];
+        $user['profile_picture'] = $storageBaseUrl . $user['path_to_profile_picture'];
+        unset($user['path_to_profile_picture']);
+
+        $notificationModel = new Notification();
+        $unreadCount = $notificationModel->countUnread($user['id']);
+
+        $user['unread_notifications_count'] = $unreadCount;
+
+        ResponseFormatter::success($user, 'User fetched successfully');
+    }
+
+    public function login()
+    {
+        $data = $_POST;
+
+//         if (!isset($data['captcha_code']) || !isset($_SESSION['code'])) {
+//            ResponseFormatter::error('Captcha code is required', 400);
+//         }
+//
+//         if ($data['captcha_code'] !== $_SESSION['code']) {
+//            unset($_SESSION['code']);
+//            ResponseFormatter::error('Invalid captcha code', 400);
+//         }
+
+        unset($_SESSION['code']);
+
+        if (!isset($data['email']) || !isset($data['password'])) {
+            ResponseFormatter::error('Email and password are required.', 400);
+            return;
+        }
+
+        $email = strip_tags($data['email']);
+        $password = strip_tags($data['password']);
+
+        $userModel = new User();
+        // findByEmail sudah melakukan JOIN ke roles, sehingga mengembalikan kolom 'role'
+        $user = $userModel->findByEmail($email);
+
+        if ($user && password_verify($password, $user['password'])) {
+            // Regenerasi ID sesi untuk keamanan (mencegah session fixation)
+            session_regenerate_id(true);
+
+            // --- LOGIKA CEK PROFILE (BARU) ---
+            $userProfileModel = new UserProfile();
+
+            // Mengambil nama role dari hasil query user (User.php: r.name AS role)
+            $roleName = $user['role'] ?? '';
+
+            // Cek apakah user ini sudah punya data di tabel profiles (mahasiswa_profiles / dosen_profiles)
+            $isProfileComplete = $userProfileModel->hasProfile($user['id'], $roleName);
+
+            // Masukkan status ke dalam array user agar Frontend tahu harus menampilkan dialog atau tidak
+            $user['is_profile_complete'] = $isProfileComplete;
+            // ----------------------------------
+
+            $config = require BASE_PATH . '/config/app.php';
+            $storageBaseUrl = $config['storage_url'];
+            $user['profile_picture'] = $storageBaseUrl . $user['path_to_profile_picture'];
+
+            // Hapus data sensitif
+            unset($user['path_to_profile_picture']);
+            unset($user['password']);
+
+            // Simpan informasi user ke dalam variabel global $_SESSION
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_name'] = $user['username'];
+            $_SESSION['role'] = $roleName; // <-- PENTING: Simpan role di session untuk ProfileController
+            $_SESSION['logged_in_at'] = time();
+
+            ResponseFormatter::success($user, 'Login successful');
+        } else {
+            ResponseFormatter::error('Invalid credentials', 401);
+        }
+    }
+
+    public function logout()
+    {
+        // 1. Hapus semua variabel sesi
+        $_SESSION = [];
+
+        // 2. Hapus cookie sesi dari browser
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+
+        // 3. Hancurkan sesi di server (akan memanggil method destroy() di handler kita)
+        session_destroy();
+
+        ResponseFormatter::success(null, 'Logout successful');
+    }
+
+//    public function activateExternalAccount()
+//    {
+//        // Ambil body JSON
+//        $input = json_decode(file_get_contents('php://input'), true);
+//        $token = $input['token'] ?? null;
+//
+//        if (!$token) {
+//            ResponseFormatter::error('Token tidak ditemukan.', 400);
+//            return;
+//        }
+//
+//        $requestModel = new AccountRequest();
+//        $request = $requestModel->findByToken($token);
+//
+//        if (!$request) {
+//            ResponseFormatter::error('Token tidak valid.', 404);
+//            return;
+//        }
+//
+//        // Pastikan status masih APPROVED, belum ACTIVATED
+//        if ($request['status'] !== 'APPROVED') {
+//            // Bisa sudah ACTIVATED, REJECTED, atau PENDING
+//            ResponseFormatter::error('Permintaan akun ini tidak dapat diaktifkan.', 400);
+//            return;
+//        }
+//
+//        // Cek expiry token (kalau ada)
+//        if (!empty($request['token_expires_at'])) {
+//            $now = new \DateTimeImmutable('now');
+//            $expiresAt = new \DateTimeImmutable($request['token_expires_at']);
+//
+//            if ($now > $expiresAt) {
+//                ResponseFormatter::error('Token aktivasi sudah kadaluarsa.', 400);
+//                return;
+//            }
+//        }
+//
+//        // Kalau semua valid: update status menjadi ACTIVATED
+//        if (!$requestModel->markActivated((int) $request['id'])) {
+//            ResponseFormatter::error('Gagal mengaktifkan akun.', 500);
+//            return;
+//        }
+//
+//        // Di sini kamu bisa lakukan hal lain kalau mau, misalnya:
+//        // - pastikan user masih is_active = TRUE
+//        // - catat log aktivasi, dsb.
+//
+//        ResponseFormatter::success(null, 'Akun Anda berhasil diaktifkan. Silakan login menggunakan email dan password Anda.');
+//    }
+
+    public function activateExternalAccount()
+    {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $token = $input['token'] ?? null;
+        $password = $input['password'] ?? null;
+        $passwordConfirmation = $input['password_confirmation'] ?? null;
+
+        if (!$token) {
+            ResponseFormatter::error('Token tidak ditemukan.', 400);
+            return;
+        }
+
+        if (!$password || strlen($password) < 8) {
+            ResponseFormatter::error('Password minimal 8 karakter.', 400);
+            return;
+        }
+
+        if ($password !== $passwordConfirmation) {
+            ResponseFormatter::error('Konfirmasi password tidak sesuai.', 400);
+            return;
+        }
+
+        $requestModel = new AccountRequest();
+        $request = $requestModel->findByToken($token);
+
+        if (!$request) {
+            ResponseFormatter::error('Token tidak valid.', 404);
+            return;
+        }
+
+        if ($request['status'] !== 'APPROVED') {
+            ResponseFormatter::error('Permintaan akun ini tidak dapat diaktifkan (status bukan APPROVED).', 400);
+            return;
+        }
+
+        // Cek expiry token
+        if (!empty($request['token_expires_at'])) {
+            $now = new \DateTimeImmutable('now');
+            $expiresAt = new \DateTimeImmutable($request['token_expires_at']);
+
+            if ($now > $expiresAt) {
+                ResponseFormatter::error('Token aktivasi sudah kadaluarsa.', 400);
+                return;
+            }
+        }
+
+        $conn = Database::getInstance()->getConnection();
+        $conn->beginTransaction();
+
+        try {
+            // 1) Ambil role_id dari roles.name
+            $roleQuery = "SELECT id FROM roles WHERE name = :name";
+            $roleStmt = $conn->prepare($roleQuery);
+            $roleStmt->bindParam(':name', $request['role_name']);
+            $roleStmt->execute();
+            $roleId = $roleStmt->fetchColumn();
+
+            if (!$roleId) {
+                throw new \Exception('Role tidak ditemukan di tabel roles.');
+            }
+
+            // 2) Insert ke users
+            $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+            $userQuery = "INSERT INTO users (fullname, username, email, bio, password, role_id, is_active)
+                      VALUES (:fullname, :username, :email, '', :password, :role_id, TRUE)
+                      RETURNING id";
+            $userStmt = $conn->prepare($userQuery);
+            $userStmt->execute([
+                ':fullname' => $request['fullname'],
+                ':username' => $request['username'],
+                ':email' => $request['email'],
+                ':password' => $hashedPassword,
+                ':role_id' => $roleId,
+            ]);
+            $userId = (int)$userStmt->fetchColumn();
+
+            // 3) Insert profil sesuai role
+            $profileData = $request['profile_data'] ?? [];
+
+            if ($request['role_name'] === 'Alumni') {
+                $q = "INSERT INTO alumni_profiles (user_id, tahun_lulus, pekerjaan_saat_ini, nama_perusahaan)
+                  VALUES (:user_id, :tahun_lulus, :pekerjaan_saat_ini, :nama_perusahaan)";
+                $stmt = $conn->prepare($q);
+                $stmt->execute([
+                    ':user_id' => $userId,
+                    ':tahun_lulus' => $profileData['tahun_lulus'],
+                    ':pekerjaan_saat_ini' => $profileData['pekerjaan_saat_ini'] ?? null,
+                    ':nama_perusahaan' => $profileData['nama_perusahaan'] ?? null,
+
+                ]);
+            } elseif ($request['role_name'] === 'Mitra') {
+                $q = "INSERT INTO mitra_profiles (user_id, nama_perusahaan, jabatan, alamat_perusahaan)
+                  VALUES (:user_id, :nama_perusahaan, :jabatan, :alamat_perusahaan)";
+                $stmt = $conn->prepare($q);
+                $stmt->execute([
+                    ':user_id' => $userId,
+                    ':nama_perusahaan' => $profileData['nama_perusahaan'] ?? '',
+                    ':jabatan' => $profileData['jabatan'] ?? '',
+                    ':alamat_perusahaan' => $profileData['alamat_perusahaan'] ?? '',
+                ]);
+            } elseif ($request['role_name'] === 'Pakar') {
+                $q = "INSERT INTO pakar_profiles (user_id, bidang_keahlian, instansi_asal)
+                  VALUES (:user_id, :bidang_keahlian, :instansi_asal)";
+                $stmt = $conn->prepare($q);
+                $stmt->execute([
+                    ':user_id' => $userId,
+                    ':bidang_keahlian' => $profileData['bidang_keahlian'] ?? '',
+                    ':instansi_asal' => $profileData['instansi_asal'] ?? ''
+                ]);
+            }
+
+            // 4) Insert membership ke komunitas
+            $qMember = "INSERT INTO community_members (user_id, community_id, status, role)
+                    VALUES (:user_id, :community_id, 'GRANTED', 'MEMBER')";
+            $stmtMember = $conn->prepare($qMember);
+            $stmtMember->execute([
+                ':user_id' => $userId,
+                ':community_id' => $request['community_id'],
+            ]);
+
+            // 5) Update account_requests jadi ACTIVATED
+            $qReq = "UPDATE account_requests
+                 SET status = 'ACTIVATED'
+                 WHERE id = :id";
+            $stmtReq = $conn->prepare($qReq);
+            $stmtReq->execute([':id' => $request['id']]);
+
+            $conn->commit();
+
+            ResponseFormatter::success(null, 'Akun berhasil dibuat dan diaktivasi. Silakan login.');
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+            ResponseFormatter::error('Gagal mengaktifkan akun: ' . $e->getMessage(), 500);
+        }
+    }
+}

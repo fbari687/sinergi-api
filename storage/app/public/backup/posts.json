@@ -1,0 +1,38 @@
+[
+    {
+        "id": 6,
+        "description": "<p><em>Apa\u00a0yang\u00a0ingin\u00a0anda\u00a0post<\/em><strong><em>\u00a0trtrtr<\/em><\/strong><\/p>",
+        "created_at": "2025-11-11 13:20:53.046554+07",
+        "updated_at": "2025-11-11 13:20:53.046554+07",
+        "is_liked_by_user": true,
+        "like_count": 1,
+        "comment_count": 1,
+        "user": {
+            "id": 5,
+            "fullname": "Dzaky Ayman Syauqi",
+            "username": "dzaky.ayman",
+            "profile_picture": "https:\/\/sinergi-api.test\/storage\/uploads\/profile_picture\/unknown.png",
+            "role": "Mahasiswa"
+        },
+        "community": null,
+        "media_url": "https:\/\/sinergi-api.test\/storage\/uploads\/post_media\/6912d5c50aa282.18067977.jpg"
+    },
+    {
+        "id": 5,
+        "description": "<p>Kalian\u00a0ga\u00a0usah\u00a0ngerjain\u00a0PBL<\/p>",
+        "created_at": "2025-11-10 13:00:09.599848+07",
+        "updated_at": "2025-11-10 13:00:09.599848+07",
+        "is_liked_by_user": true,
+        "like_count": 1,
+        "comment_count": 1,
+        "user": {
+            "id": 2,
+            "fullname": "Bambang Warsuta",
+            "username": "bambang.warsuta",
+            "profile_picture": "https:\/\/sinergi-api.test\/storage\/uploads\/profile_picture\/pa_bambang.jpeg",
+            "role": "Dosen"
+        },
+        "community": null,
+        "media_url": null
+    }
+]
