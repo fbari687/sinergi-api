@@ -21,8 +21,13 @@ jobs:
           port: 22
           # Di bawah ini adalah perintah yang dijalankan di VPS
           script: |
+            git config --global --add safe.directory /var/www/sinergi
             cd /var/www/sinergi
+            git fetch --all
+            git reset --hard origin/main
             git pull origin main
+            
+            chown -R www-data:www-data /var/www/sinergi
             
             # Restart Nginx/PHP agar perubahan terbaca (terkadang perlu)
             sudo systemctl reload nginx

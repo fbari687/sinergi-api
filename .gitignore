@@ -1,3 +1,8 @@
 /vendor
 .env
 .idea
+/storage/app/public/backup/*
+/storage/app/public/uploads/community_thumbnails/*
+/storage/app/public/uploads/forum_media/*
+/storage/app/public/uploads/post_media/*
+/storage/app/public/uploads/profile_picture/*
