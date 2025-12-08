@@ -16,6 +16,7 @@ class CaptchaController
 
     public function generate() {
         $code = $this->acakCaptcha();
+        if (session_status() === PHP_SESSION_NONE) session_start();
         $_SESSION["code"] = $code; // Simpan kode di sesi
 
         $wh = imagecreatetruecolor(173, 50);
@@ -25,6 +26,11 @@ class CaptchaController
         imagestring($wh, 10, 50, 15, $code, $fc);
 
         // Atur header dan kirim gambar
+        header("Access-Control-Allow-Origin: " . $_ENV['FRONTEND_URL']);
+        header("Access-Control-Allow-Credentials: true");
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
         header('content-type: image/jpg');
         imagejpeg($wh);
         imagedestroy($wh);

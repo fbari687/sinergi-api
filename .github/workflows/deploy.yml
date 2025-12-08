@@ -1,0 +1,29 @@
+name: Deploy Backend to VPS
+
+on:
+  push:
+    branches:
+      - main  # Trigger hanya saat push ke branch main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          # Di bawah ini adalah perintah yang dijalankan di VPS
+          script: |
+            cd /var/www/sinergi
+            git pull origin main
+            
+            # Restart Nginx/PHP agar perubahan terbaca (terkadang perlu)
+            sudo systemctl reload nginx
+            sudo systemctl reload php8.3-fpm
