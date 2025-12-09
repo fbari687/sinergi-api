@@ -5,6 +5,7 @@ namespace app\controllers;
 use app\helpers\FileHelper;
 use app\helpers\ResponseFormatter;
 use app\models\Community;
+use app\models\CommunityMember;
 use app\models\Forum;
 require BASE_PATH . '/vendor/autoload.php';
 use HTMLPurifier;
@@ -51,6 +52,16 @@ class ForumController {
 
         if (!$forum) {
             ResponseFormatter::error("Forum topic not found", 404);
+        }
+
+        $memberModel = new CommunityMember();
+        $isMember = $memberModel->isUserMember($_SESSION['user_id'], $forum['community_id']);
+
+        $isAdmin = $_SESSION['user']['role_name'] === 'Admin';
+
+        if (!$isMember && !$isAdmin) {
+            ResponseFormatter::error('You are not a member of this community', 403);
+            return;
         }
 
         // Format Foto

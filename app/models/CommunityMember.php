@@ -207,4 +207,13 @@ class CommunityMember
         $stmt->execute();
         return $stmt->fetch()['total'] > 0;
     }
+
+    public function isUserMemberOrInvited($userId, $communityId) {
+        $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE user_id = :user_id AND community_id = :community_id AND status IN ('GRANTED', 'INVITED')";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->bindParam(':community_id', $communityId);
+        $stmt->execute();
+        return $stmt->fetch()['total'] > 0;
+    }
 }

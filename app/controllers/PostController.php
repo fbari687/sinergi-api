@@ -188,10 +188,17 @@ class PostController {
             $memberModel = new CommunityMember();
             $isMember = $memberModel->isUserMember($_SESSION['user_id'], $post['community_id']);
 
-            $isAdmin = $_SESSION['user']['role_name'] === 'ADMIN';
+            $isAdmin = $_SESSION['user']['role_name'] === 'Admin';
 
             if (!$isMember && !$isAdmin) {
                 ResponseFormatter::error('You are not a member of this community', 403);
+                return;
+            }
+        } else {
+            $isExternal = $_SESSION['user']['role_name'] === 'Pakar' || $_SESSION['user']['role_name'] === 'Mitra' || $_SESSION['user']['role_name'] === 'Alumni';
+
+            if ($isExternal) {
+                ResponseFormatter::error('You are not a internal member', 403);
                 return;
             }
         }

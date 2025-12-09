@@ -32,6 +32,18 @@ class CommunityController
         if (!$community) {
             ResponseFormatter::error('Community not found', 404);
         } else {
+
+            $isExternal = $_SESSION['user']['role_name'] === 'Pakar' || $_SESSION['user']['role_name'] === 'Mitra' || $_SESSION['user']['role_name'] === 'Alumni';
+
+            if ($isExternal) {
+                $memberModel = new CommunityMember();
+                $isMemberOrInvited = $memberModel->isUserMemberOrInvited($_SESSION['user_id'], $community['id']);
+                if (!$isMemberOrInvited) {
+                    ResponseFormatter::error('You are not a member of this community', 403);
+                    return;
+                }
+            }
+
             $config = require BASE_PATH . '/config/app.php';
             $storageBaseUrl = $config['storage_url'];
 
