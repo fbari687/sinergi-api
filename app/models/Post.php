@@ -20,7 +20,7 @@ class Post
     public function getAllPostInOneCommunity($community_id, $user_id, $limit = 10, $offset = 0, $search = null)
     {
         // Query dasar (tanpa ORDER BY dan LIMIT dulu)
-        $query = "SELECT p.id, p.description, p.path_to_media, p.user_id, p.community_id, u.fullname, u.username, u.path_to_profile_picture, r.name AS role, p.created_at, p.updated_at, (pl_user.id IS NOT NULL) AS is_liked_by_user,
+        $query = "SELECT p.id, p.description, p.path_to_media, p.is_edited, p.user_id, p.community_id, u.fullname, u.username, u.path_to_profile_picture, r.name AS role, p.created_at, p.updated_at, (pl_user.id IS NOT NULL) AS is_liked_by_user,
             COALESCE(lc.like_count, 0) AS like_count,
             COALESCE(cc.comment_count, 0) AS comment_count
             FROM {$this->table} p
@@ -71,7 +71,7 @@ class Post
     public function getAllPostInHome($user_id, $limit = 10, $offset = 0, $search = null)
     {
         // Query Dasar
-        $query = "SELECT p.id, p.description, p.path_to_media, p.user_id, u.fullname, u.username, u.path_to_profile_picture, r.name AS role, p.created_at, p.updated_at, (pl_user.id IS NOT NULL) AS is_liked_by_user,
+        $query = "SELECT p.id, p.description, p.path_to_media, p.is_edited, p.user_id, u.fullname, u.username, u.path_to_profile_picture, r.name AS role, p.created_at, p.updated_at, (pl_user.id IS NOT NULL) AS is_liked_by_user,
             COALESCE(lc.like_count, 0) AS like_count,
             COALESCE(cc.comment_count, 0) AS comment_count
             FROM {$this->table} p

@@ -11,15 +11,16 @@ class ForumRespond {
         $this->conn = Database::getInstance()->getConnection();
     }
 
-    public function create($userId, $forumId, $message, $parentId = null) {
-        $query = "INSERT INTO {$this->table} (user_id, forum_id, message, parent_id) 
-                  VALUES (:user_id, :forum_id, :message, :parent_id) RETURNING id";
+    public function create($userId, $forumId, $message, $parentId = null, $pathToMedia = null) {
+        $query = "INSERT INTO {$this->table} (user_id, forum_id, message, parent_id, path_to_media) 
+                  VALUES (:user_id, :forum_id, :message, :parent_id, :path_to_media) RETURNING id";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':user_id', $userId);
         $stmt->bindParam(':forum_id', $forumId);
         $stmt->bindParam(':message', $message);
         $stmt->bindParam(':parent_id', $parentId);
+        $stmt->bindParam(':path_to_media', $pathToMedia);
 
         if ($stmt->execute()) {
             return $stmt->fetch();
@@ -27,20 +28,33 @@ class ForumRespond {
         return false;
     }
 
-    public function getAnswersByForumId($forumId) {
+    public function getAnswersByForumId($forumId, $currentUserId = null) {
         $query = "SELECT 
-                    fr.*,
-                    u.fullname, u.username, u.path_to_profile_picture as profile_picture
-                  FROM {$this->table} fr
-                  JOIN users u ON fr.user_id = u.id
-                  WHERE fr.forum_id = :forum_id 
-                    AND fr.parent_id IS NULL -- Hanya jawaban utama
-                  ORDER BY 
-                    fr.is_accepted DESC, -- Solusi terpilih selalu paling atas (ala StackOverflow)
-                    fr.created_at ASC";  // Jawaban lama di atas (kronologis)
+                fr.*,
+                u.fullname, u.username, u.path_to_profile_picture as profile_picture,
+                
+                -- Hitung Total Vote per Jawaban
+                (SELECT COALESCE(SUM(reaction), 0) 
+                 FROM forums_respond_reactions 
+                 WHERE forum_respond_id = fr.id) as vote_count,
+                 
+                -- Cek Vote User Login per Jawaban
+                (SELECT reaction 
+                 FROM forums_respond_reactions 
+                 WHERE forum_respond_id = fr.id AND user_id = :user_id) as user_vote
+
+              FROM {$this->table} fr
+              JOIN users u ON fr.user_id = u.id
+              WHERE fr.forum_id = :forum_id 
+                AND fr.parent_id IS NULL 
+              ORDER BY 
+                fr.is_accepted DESC,  -- 1. Solusi terpilih paling atas
+                vote_count DESC,      -- 2. Vote tertinggi kedua
+                fr.created_at ASC";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':forum_id', $forumId);
+        $stmt->bindParam(':user_id', $currentUserId);
         $stmt->execute();
         return $stmt->fetchAll();
     }

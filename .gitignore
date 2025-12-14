@@ -6,4 +6,5 @@
 /storage/app/public/uploads/forum_media/*
 /storage/app/public/uploads/post_media/*
 /storage/app/public/uploads/profile_picture/*
+/storage/app/public/uploads/forum_respond_media/*
 /public/storage

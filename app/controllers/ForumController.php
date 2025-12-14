@@ -48,7 +48,7 @@ class ForumController {
 
     public function show($slug, $id) {
         $forumModel = new Forum();
-        $forum = $forumModel->findById($id);
+        $forum = $forumModel->findById($id, $_SESSION['user_id']);
 
         if (!$forum) {
             ResponseFormatter::error("Forum topic not found", 404);

@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use app\helpers\FileHelper;
 use app\helpers\ResponseFormatter;
 use app\models\Forum;
 use app\models\ForumRespond;
@@ -11,13 +12,14 @@ class ForumRespondController {
         $respondModel = new ForumRespond();
 
         // 1. Ambil Jawaban Utama
-        $answers = $respondModel->getAnswersByForumId($forumId);
+        $answers = $respondModel->getAnswersByForumId($forumId, $_SESSION['user_id']);
 
         // 2. Format Data (Foto Profil & Ambil Replies)
         $config = require BASE_PATH . '/config/app.php';
 
         $formattedAnswers = array_map(function($ans) use ($respondModel, $config) {
             $ans['profile_picture_url'] = $ans['profile_picture'] ? $config['storage_url'] . $ans['profile_picture'] : null;
+            $ans['media_url'] = $ans['path_to_media'] ? $config['storage_url'] . $ans['path_to_media'] : null;
 
             // Ambil Komentar/Reply untuk jawaban ini (Nested)
             $replies = $respondModel->getRepliesByParentId($ans['id']);
@@ -41,12 +43,26 @@ class ForumRespondController {
         // parent_id opsional. Jika null = Answer, Jika isi = Reply
         $parentId = $data['parent_id'] == 'null' ? null : $data['parent_id'];
 
+        if (isset($_FILES['media']) && $_FILES['media']['error'] === 0) {
+            $uploadedPath = FileHelper::upload(
+                $_FILES['media'],
+                'uploads/forum_respond_media',
+                ['image/jpeg', 'image/png', 'image/jpg'],
+                5 * 1024 * 1024
+            );
+
+            if (!$uploadedPath) {
+                ResponseFormatter::error("Failed to upload media", 500);
+            }
+        }
+
         $respondModel = new ForumRespond();
         $id = $respondModel->create(
             $_SESSION['user_id'],
             $forumId,
             $data['message'],
-            $parentId
+            $parentId,
+            $uploadedPath ?? null,
         );
 
         if ($id) {

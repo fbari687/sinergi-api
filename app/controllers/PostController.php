@@ -53,6 +53,7 @@ class PostController {
 
         $isPublic = $community['is_public'];
         $isMember = false;
+        $isAdmin = $_SESSION['user']['role_name'] === 'Admin';
         if (!$isPublic) {
             $memberModel = new CommunityMember();
             $membership = $memberModel->findRoleUserById($_SESSION['user_id'], $communityId);
@@ -62,7 +63,9 @@ class PostController {
         }
 
         if (!$isPublic && !$isMember) {
+            if (!$isAdmin) {
             ResponseFormatter::error('This community is private. Join to view posts.', 403);
+            }
         }
 
         $config = require BASE_PATH . '/config/app.php';

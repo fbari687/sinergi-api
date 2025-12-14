@@ -33,6 +33,12 @@ class ForumReactionController {
             ResponseFormatter::error('Incomplete data', 400);
         }
 
+        $inputReaction = (int) $data['reaction'];
+        if (!in_array($inputReaction, [1, -1])) {
+            ResponseFormatter::error('Invalid reaction value. Must be 1 (upvote) or -1 (downvote).', 400);
+            return;
+        }
+
         $forumModel = new Forum();
         $forumData = $forumModel->findById($forumId);
 
@@ -42,41 +48,55 @@ class ForumReactionController {
 
         $forumReactionModel = new ForumReaction();
 
-        $forumReactionData = $forumReactionModel->findByForumIdAndUserId($forumId, $_SESSION['user_id']);
+        $existingReaction = $forumReactionModel->findByForumIdAndUserId($forumId, $_SESSION['user_id']);
 
-        if (!$forumReactionData) {
+        // SKENARIO A: Belum pernah vote -> Buat baru
+        if (!$existingReaction) {
             $forumReactionData = [
                 'forum_id' => $forumId,
                 'user_id' => $_SESSION['user_id'],
-                'reaction' => $data['reaction']
+                'reaction' => $inputReaction
             ];
 
             $result = $forumReactionModel->create($forumReactionData);
 
             if (!$result) {
                 ResponseFormatter::error('Failed to create forum reaction', 500);
+                return;
             }
-            ResponseFormatter::success(null, 'Forum reaction created successfully');
+            ResponseFormatter::success(['action' => 'created', 'reaction' => $inputReaction], 'Forum reaction created successfully');
+            return;
         }
 
-        if ($forumReactionData['reaction'] === filter_var($data['reaction'], FILTER_VALIDATE_BOOLEAN)) {
-            $result = $forumReactionModel->delete($forumReactionData['id']);
+        // Ambil reaction yang ada di database (pastikan jadi int)
+        $currentReactionValue = (int)$existingReaction['reaction'];
+
+        // SKENARIO B: Vote sama dengan yang dikirim -> Hapus (Toggle Off / Netral)
+        // Contoh: Sudah Upvote, klik Upvote lagi -> Jadi Netral
+        if ($currentReactionValue === $inputReaction) {
+            $result = $forumReactionModel->delete($existingReaction['id']);
             if (!$result) {
                 ResponseFormatter::error('Failed to delete forum reaction', 500);
+                return;
             }
-            ResponseFormatter::success(null, 'Forum reaction deleted successfully');
+            ResponseFormatter::success(['action' => 'deleted', 'reaction' => 0], 'Forum reaction deleted (neutralized) successfully');
+            return;
         }
 
-        if ($forumReactionData['reaction'] !== filter_var($data['reaction'], FILTER_VALIDATE_BOOLEAN)) {
-            $forumReactionData = [
-                'id' => $forumReactionData['id'],
-                'reaction' => $data['reaction']
+        // SKENARIO C: Vote berbeda -> Update
+        // Contoh: Sudah Upvote, klik Downvote -> Ubah jadi Downvote
+        if ($currentReactionValue !== $inputReaction) {
+            $updateData = [
+                'id' => $existingReaction['id'],
+                'reaction' => $inputReaction
             ];
-            $result = $forumReactionModel->update($forumReactionData);
+            $result = $forumReactionModel->update($updateData);
             if (!$result) {
                 ResponseFormatter::error('Failed to update forum reaction', 500);
+                return;
             }
-            ResponseFormatter::success(null, 'Forum reaction updated successfully');
+            ResponseFormatter::success(['action' => 'updated', 'reaction' => $inputReaction], 'Forum reaction updated successfully');
+            return;
         }
     }
 }

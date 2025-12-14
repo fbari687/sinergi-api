@@ -251,6 +251,7 @@ class Dashboard
                 c.name AS community_name
             FROM account_requests ar
             JOIN communities c ON c.id = ar.community_id
+            WHERE ar.status = 'PENDING'
             ORDER BY ar.created_at DESC
             LIMIT 10
         ";
