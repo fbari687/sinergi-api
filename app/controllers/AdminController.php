@@ -15,10 +15,43 @@ class AdminController
     public function dashboardOverview()
     {
         try {
+            $period = $_GET['period'] ?? '7_days';
+            $type = $_GET['type'] ?? 'ALL_COMBINED';
+
             $dashboard = new Dashboard();
-            $data = $dashboard->getOverview();
+            // Pass parameter ke method getOverview
+            $data = $dashboard->getOverview($period, $type);
+
+            $config = require BASE_PATH . '/config/app.php';
+            $storageBaseUrl = $config['storage_url'];
+
+            $data['leaderboard'] = $this->formatMemberData($data['leaderboard'], $storageBaseUrl);
 
             ResponseFormatter::success($data, 'Dashboard overview fetched');
+        } catch (\Throwable $e) {
+            ResponseFormatter::error($e->getMessage(), 500);
+        }
+    }
+
+    public function globalLeaderboard()
+    {
+        try {
+            $period = $_GET['period'] ?? 'this_month';
+
+            $dashboard = new Dashboard();
+
+            // 1. Hitung tanggal berdasarkan helper yang sudah dibuat sebelumnya
+            [$start, $end] = $dashboard->getDateRange($period);
+
+            // 2. Ambil data dengan limit lebih besar (misal 50 atau 100)
+            $data = $dashboard->getGlobalLeaderboard($start, $end, 100);
+
+            $config = require BASE_PATH . '/config/app.php';
+            $storageBaseUrl = $config['storage_url'];
+
+            $data = $this->formatMemberData($data, $storageBaseUrl);
+
+            ResponseFormatter::success($data, 'Global leaderboard fetched');
         } catch (\Throwable $e) {
             ResponseFormatter::error($e->getMessage(), 500);
         }
@@ -79,5 +112,17 @@ class AdminController
         } else {
             ResponseFormatter::error('Failed to reject', 500);
         }
+    }
+
+    private function formatMemberData($members, $storageBaseUrl) {
+        return array_map(function($member) use ($storageBaseUrl) {
+            if (!empty($member['path_to_profile_picture'])) {
+                $member['profile_picture'] = $storageBaseUrl . $member['path_to_profile_picture'];
+            } else {
+                $member['profile_picture'] = null;
+            }
+            unset($member['path_to_profile_picture']);
+            return $member;
+        }, $members);
     }
 }

@@ -262,6 +262,9 @@ function register_routes(Router $router)
     $router->addRoute('GET', 'api/admin/dashboard/overview', 'AdminController@dashboardOverview',
         ['Authenticate', 'Role:Admin,Dosen']
     );
+    $router->addRoute('GET', 'api/admin/leaderboard', 'AdminController@globalLeaderboard',
+        ['Authenticate', 'Role:Admin,Dosen']
+    );
     $router->addRoute('GET', 'api/admin/account-requests', 'AdminController@getPendingRequests',
         ['Authenticate', 'Role:Admin']
     );
