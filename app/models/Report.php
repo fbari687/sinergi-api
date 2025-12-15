@@ -146,4 +146,46 @@ class Report
 
         return $stmt->execute();
     }
+
+    public function deleteByTarget(string $reportableType, int $reportableId): bool
+    {
+        $sql = "
+        DELETE FROM {$this->table}
+        WHERE reportable_type = :type
+          AND reportable_id = :id
+    ";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':type', $reportableType);
+        $stmt->bindParam(':id', $reportableId, PDO::PARAM_INT);
+
+        return $stmt->execute();
+    }
+
+    public function deleteByTargets(string $reportableType, array $reportableIds): bool
+    {
+        if (empty($reportableIds)) {
+            return true; // tidak ada yang perlu dihapus
+        }
+
+        // Pastikan semua ID integer
+        $placeholders = implode(',', array_fill(0, count($reportableIds), '?'));
+
+        $sql = "
+        DELETE FROM {$this->table}
+        WHERE reportable_type = ?
+          AND reportable_id IN ({$placeholders})
+    ";
+
+        $stmt = $this->conn->prepare($sql);
+
+        // Bind parameter (type di awal, lalu ID)
+        $stmt->bindValue(1, $reportableType);
+        $index = 2;
+        foreach ($reportableIds as $id) {
+            $stmt->bindValue($index++, (int)$id, PDO::PARAM_INT);
+        }
+
+        return $stmt->execute();
+    }
 }

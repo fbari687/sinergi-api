@@ -189,4 +189,14 @@ class Post
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
     }
+
+    public function getPostIdsByCommunityId(int $communityId): array
+    {
+        $query = "SELECT id FROM {$this->table} WHERE community_id = :community_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':community_id', $communityId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
 }

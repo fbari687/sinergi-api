@@ -120,12 +120,12 @@ class Dashboard
             agg AS (
                 SELECT
                     COUNT(CASE 
-                        WHEN status = 'PENDING'
+                        WHEN status = 'OPEN'
                          AND created_at >= NOW() - INTERVAL '7 days'
                         THEN 1 END
                     ) AS current,
                     COUNT(CASE 
-                        WHEN status = 'PENDING'
+                        WHEN status = 'OPEN'
                          AND created_at >= NOW() - INTERVAL '14 days'
                          AND created_at <  NOW() - INTERVAL '7 days'
                         THEN 1 END

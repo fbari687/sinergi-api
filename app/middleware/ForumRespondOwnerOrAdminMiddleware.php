@@ -31,7 +31,7 @@ class ForumRespondOwnerOrAdminMiddleware {
         }
 
         if ($_SESSION['user']['role_name'] === 'Admin') {
-            exit();
+            return;
         } else {
             $forumRespondUserId = $forumRespondData['user_id'];
 

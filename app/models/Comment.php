@@ -3,6 +3,7 @@
 namespace app\models;
 
 use app\core\Database;
+use PDO;
 
 class Comment {
     private $conn;
@@ -68,6 +69,16 @@ class Comment {
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
+    }
+
+    public function getCommentIdsByPostId(int $postId): array
+    {
+        $query = "SELECT id FROM {$this->table} WHERE post_id = :post_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':post_id', $postId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
 }

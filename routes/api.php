@@ -45,6 +45,9 @@ function register_routes(Router $router)
     $router->addRoute('GET', 'api/communities', 'CommunityController@index',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa']
     );
+    $router->addRoute('GET', 'api/communities/all', 'CommunityController@getAllCommunities',
+        ['Authenticate', 'Role:Admin']
+    );
     $router->addRoute('GET', 'api/communities/recommended', 'CommunityController@getRecommendedCommunities',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa']
     );
@@ -65,6 +68,12 @@ function register_routes(Router $router)
     );
     $router->addRoute('POST', 'api/communities/{slug}/delete', 'CommunityController@delete',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa', 'CommunityRole:OWNER']
+    );
+    $router->addRoute('GET', 'api/communities/{slug}/dashboard', 'CommunityController@getDashboardMetrics',
+        ['Authenticate', 'Role:Admin,Dosen,Mahasiswa', 'CommunityRole:OWNER,ADMIN']
+    );
+    $router->addRoute('GET', 'api/communities/{slug}/leaderboard', 'CommunityController@getLeaderboard',
+        ['Authenticate', 'Role:Admin,Dosen,Mahasiswa', 'CommunityRole:OWNER,ADMIN']
     );
     $router->addRoute('POST', 'api/join/communities/{slug}', 'CommunityController@join',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa']
@@ -174,6 +183,9 @@ function register_routes(Router $router)
     // Detail Topik
     $router->addRoute('GET', 'api/communities/{slug}/forums/{id}', 'ForumController@show',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa,Alumni,Mitra,Pakar']
+    );
+    $router->addRoute('GET', 'api/forums/{id}', 'ForumController@showById',
+        ['Authenticate', 'Role:Admin']
     );
     $router->addRoute('POST', 'api/forums/{id}/update', 'ForumController@update',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa,Alumni,Mitra,Pakar', 'ForumOwnerOrAdminMiddleware']

@@ -45,7 +45,6 @@ class AccountRequest
               FROM {$this->table} ar
               JOIN communities c ON ar.community_id = c.id
               JOIN users u ON ar.requester_id = u.id
-              WHERE ar.status = 'PENDING'
               ORDER BY ar.created_at DESC";
 
         $stmt = $this->conn->prepare($query);
@@ -133,5 +132,14 @@ class AccountRequest
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id, \PDO::PARAM_INT);
         return $stmt->execute();
+    }
+
+    public function updateStatus($id, $status) {
+        $query = "UPDATE {$this->table} SET status = :status WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            ':status' => $status,
+            ':id' => $id
+        ]);
     }
 }

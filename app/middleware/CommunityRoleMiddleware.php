@@ -34,6 +34,10 @@ class CommunityRoleMiddleware {
             ResponseFormatter::error('Forbidden: Community not found.', 403);
         }
 
+        if ($_SESSION['user']['role_name'] === 'Admin') {
+            return;
+        }
+
         $memberModel = new CommunityMember();
         $membership = $memberModel->findRoleUserById($userId, $communityId);
 

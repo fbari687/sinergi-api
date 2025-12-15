@@ -4,6 +4,7 @@ namespace app\controllers;
 
 use app\helpers\FileHelper;
 use app\helpers\ResponseFormatter;
+use app\models\Comment;
 use app\models\Community;
 use app\models\CommunityMember;
 use app\models\Post;
@@ -11,6 +12,7 @@ use app\models\Post;
 require BASE_PATH . '/vendor/autoload.php';
 
 use app\models\PostLike;
+use app\models\Report;
 use HTMLPurifier;
 use HTMLPurifier_Config;
 
@@ -290,6 +292,17 @@ class PostController {
         if (!$postData) {
             ResponseFormatter::error('Post not found', 404);
         }
+
+        $commentModel = new Comment();
+        $commentIds = $commentModel->getCommentIdsByPostId((int)$id);
+
+        $reportModel = new Report();
+        $reportModel->deleteByTarget('POST', (int)$id);
+
+        if (!empty($commentIds)) {
+            $reportModel->deleteByTargets('COMMENT', $commentIds);
+        }
+
         $deletePost = $postModel->delete($id);
         if (!$deletePost) {
             ResponseFormatter::error('Failed to delete post', 500);

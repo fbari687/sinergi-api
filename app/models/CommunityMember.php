@@ -216,4 +216,16 @@ class CommunityMember
         $stmt->execute();
         return $stmt->fetch()['total'] > 0;
     }
+
+    public function addMember($userId, $communityId, $status = 'GRANTED', $role = 'MEMBER') {
+        $query = "INSERT INTO {$this->table} (user_id, community_id, status, role)
+                  VALUES (:user_id, :community_id, :status, :role)";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            ':user_id' => $userId,
+            ':community_id' => $communityId,
+            ':status' => $status,
+            ':role' => $role
+        ]);
+    }
 }

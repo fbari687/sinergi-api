@@ -34,8 +34,9 @@ class PostOwnerOrAdminMiddleware
             ResponseFormatter::error('Forbidden: Post not found.', 403);
         }
 
+
         if ($_SESSION['user']['role_name'] === 'Admin') {
-            exit();
+            return;
         } else {
             $postUserId = $postData['user_id'];
 

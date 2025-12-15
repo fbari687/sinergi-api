@@ -190,4 +190,21 @@ class User {
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    public function createActivatedUser($fullname, $username, $email, $password, $roleId) {
+        $query = "INSERT INTO {$this->table} (fullname, username, email, bio, password, role_id, is_active)
+              VALUES (:fullname, :username, :email, '', :password, :role_id, TRUE)
+              RETURNING id";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([
+            ':fullname' => $fullname,
+            ':username' => $username,
+            ':email' => $email,
+            ':password' => $password,
+            ':role_id' => $roleId,
+        ]);
+
+        return (int)$stmt->fetchColumn();
+    }
 }

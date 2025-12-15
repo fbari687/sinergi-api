@@ -6,8 +6,10 @@ use app\core\Database;
 use app\helpers\MailHelper;
 use app\helpers\ResponseFormatter;
 use app\models\AccountRequest;
+use app\models\CommunityMember;
 use app\models\Notification;
 use app\models\Otp;
+use app\models\Role;
 use app\models\User;
 use app\models\UserProfile;
 
@@ -438,7 +440,7 @@ class AuthController
         $passwordConfirmation = $input['password_confirmation'] ?? null;
 
         if (!$token) {
-            ResponseFormatter::error('Token tidak ditemukan.', 400);
+                ResponseFormatter::error('Token tidak ditemukan.', 400);
             return;
         }
 
@@ -480,89 +482,56 @@ class AuthController
         $conn->beginTransaction();
 
         try {
-            // 1) Ambil role_id dari roles.name
-            $roleQuery = "SELECT id FROM roles WHERE name = :name";
-            $roleStmt = $conn->prepare($roleQuery);
-            $roleStmt->bindParam(':name', $request['role_name']);
-            $roleStmt->execute();
-            $roleId = $roleStmt->fetchColumn();
+            // 1. Ambil Role ID
+            $roleModel = new Role();
+            $roleId = $roleModel->findIdByName($request['role_name']);
 
             if (!$roleId) {
                 throw new \Exception('Role tidak ditemukan di tabel roles.');
             }
 
-            // 2) Insert ke users
+            // 2. Buat User Baru
+            $userModel = new User();
             $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
-            $userQuery = "INSERT INTO users (fullname, username, email, bio, password, role_id, is_active)
-                      VALUES (:fullname, :username, :email, '', :password, :role_id, TRUE)
-                      RETURNING id";
-            $userStmt = $conn->prepare($userQuery);
-            $userStmt->execute([
-                ':fullname' => $request['fullname'],
-                ':username' => $request['username'],
-                ':email' => $request['email'],
-                ':password' => $hashedPassword,
-                ':role_id' => $roleId,
-            ]);
-            $userId = (int)$userStmt->fetchColumn();
+            // Method baru di model User
+            $userId = $userModel->createActivatedUser(
+                $request['fullname'],
+                $request['username'],
+                $request['email'],
+                $hashedPassword,
+                $roleId
+            );
 
-            // 3) Insert profil sesuai role
+            // 3. Insert Profile
+            $profileModel = new UserProfile();
             $profileData = $request['profile_data'] ?? [];
 
             if ($request['role_name'] === 'Alumni') {
-                $q = "INSERT INTO alumni_profiles (user_id, tahun_lulus, pekerjaan_saat_ini, nama_perusahaan)
-                  VALUES (:user_id, :tahun_lulus, :pekerjaan_saat_ini, :nama_perusahaan)";
-                $stmt = $conn->prepare($q);
-                $stmt->execute([
-                    ':user_id' => $userId,
-                    ':tahun_lulus' => $profileData['tahun_lulus'],
-                    ':pekerjaan_saat_ini' => $profileData['pekerjaan_saat_ini'] ?? null,
-                    ':nama_perusahaan' => $profileData['nama_perusahaan'] ?? null,
-
-                ]);
+                $profileModel->createAlumniProfile($userId, $profileData);
             } elseif ($request['role_name'] === 'Mitra') {
-                $q = "INSERT INTO mitra_profiles (user_id, nama_perusahaan, jabatan, alamat_perusahaan)
-                  VALUES (:user_id, :nama_perusahaan, :jabatan, :alamat_perusahaan)";
-                $stmt = $conn->prepare($q);
-                $stmt->execute([
-                    ':user_id' => $userId,
-                    ':nama_perusahaan' => $profileData['nama_perusahaan'] ?? '',
-                    ':jabatan' => $profileData['jabatan'] ?? '',
-                    ':alamat_perusahaan' => $profileData['alamat_perusahaan'] ?? '',
-                ]);
+                $profileModel->createMitraProfile($userId, $profileData);
             } elseif ($request['role_name'] === 'Pakar') {
-                $q = "INSERT INTO pakar_profiles (user_id, bidang_keahlian, instansi_asal)
-                  VALUES (:user_id, :bidang_keahlian, :instansi_asal)";
-                $stmt = $conn->prepare($q);
-                $stmt->execute([
-                    ':user_id' => $userId,
-                    ':bidang_keahlian' => $profileData['bidang_keahlian'] ?? '',
-                    ':instansi_asal' => $profileData['instansi_asal'] ?? ''
-                ]);
+                $profileModel->createPakarProfile($userId, $profileData);
             }
 
-            // 4) Insert membership ke komunitas
-            $qMember = "INSERT INTO community_members (user_id, community_id, status, role)
-                    VALUES (:user_id, :community_id, 'GRANTED', 'MEMBER')";
-            $stmtMember = $conn->prepare($qMember);
-            $stmtMember->execute([
-                ':user_id' => $userId,
-                ':community_id' => $request['community_id'],
-            ]);
+            // 4. Masukkan ke Komunitas
+            $communityMemberModel = new CommunityMember();
+            $communityMemberModel->addMember($userId, $request['community_id']);
 
-            // 5) Update account_requests jadi ACTIVATED
-            $qReq = "UPDATE account_requests
-                 SET status = 'ACTIVATED'
-                 WHERE id = :id";
-            $stmtReq = $conn->prepare($qReq);
-            $stmtReq->execute([':id' => $request['id']]);
+            // 5. Update Status Request
+            $requestModel->updateStatus($request['id'], 'ACTIVATED');
 
+            // --- COMMIT TRANSAKSI ---
             $conn->commit();
 
             ResponseFormatter::success(null, 'Akun berhasil dibuat dan diaktivasi. Silakan login.');
+
         } catch (\Throwable $e) {
+            // --- ROLLBACK JIKA ERROR ---
             $conn->rollBack();
+            // Log error sebenarnya untuk developer, tapi kembalikan pesan umum/spesifik ke user
+            // error_log($e->getMessage());
             ResponseFormatter::error('Gagal mengaktifkan akun: ' . $e->getMessage(), 500);
         }
     }

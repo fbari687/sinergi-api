@@ -54,4 +54,39 @@ class UserProfile
         $stmt->bindParam(':bidang_keahlian', $data['bidang_keahlian']);
         return $stmt->execute();
     }
+
+    public function createAlumniProfile($userId, $data) {
+        $query = "INSERT INTO alumni_profiles (user_id, tahun_lulus, pekerjaan_saat_ini, nama_perusahaan)
+              VALUES (:user_id, :tahun_lulus, :pekerjaan_saat_ini, :nama_perusahaan)";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            ':user_id' => $userId,
+            ':tahun_lulus' => $data['tahun_lulus'],
+            ':pekerjaan_saat_ini' => $data['pekerjaan_saat_ini'] ?? null,
+            ':nama_perusahaan' => $data['nama_perusahaan'] ?? null,
+        ]);
+    }
+
+    public function createMitraProfile($userId, $data) {
+        $query = "INSERT INTO mitra_profiles (user_id, nama_perusahaan, jabatan, alamat_perusahaan)
+              VALUES (:user_id, :nama_perusahaan, :jabatan, :alamat_perusahaan)";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            ':user_id' => $userId,
+            ':nama_perusahaan' => $data['nama_perusahaan'] ?? '',
+            ':jabatan' => $data['jabatan'] ?? '',
+            ':alamat_perusahaan' => $data['alamat_perusahaan'] ?? '',
+        ]);
+    }
+
+    public function createPakarProfile($userId, $data) {
+        $query = "INSERT INTO pakar_profiles (user_id, bidang_keahlian, instansi_asal)
+              VALUES (:user_id, :bidang_keahlian, :instansi_asal)";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            ':user_id' => $userId,
+            ':bidang_keahlian' => $data['bidang_keahlian'] ?? '',
+            ':instansi_asal' => $data['instansi_asal'] ?? ''
+        ]);
+    }
 }

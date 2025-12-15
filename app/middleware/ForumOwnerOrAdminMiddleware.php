@@ -31,7 +31,7 @@ class ForumOwnerOrAdminMiddleware {
         }
 
         if ($_SESSION['user']['role_name'] === 'Admin') {
-            exit();
+            return;
         } else {
             $forumUserId = $forumData['user_id'];
 

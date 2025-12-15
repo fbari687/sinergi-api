@@ -8,6 +8,9 @@ use app\models\Community;
 use app\models\CommunityMember;
 use app\models\Forum;
 require BASE_PATH . '/vendor/autoload.php';
+
+use app\models\ForumRespond;
+use app\models\Report;
 use HTMLPurifier;
 use HTMLPurifier_Config;
 
@@ -47,6 +50,38 @@ class ForumController {
     }
 
     public function show($slug, $id) {
+        $forumModel = new Forum();
+        $forum = $forumModel->findById($id, $_SESSION['user_id']);
+
+        if (!$forum) {
+            ResponseFormatter::error("Forum topic not found", 404);
+        }
+
+        $memberModel = new CommunityMember();
+        $isMember = $memberModel->isUserMember($_SESSION['user_id'], $forum['community_id']);
+
+        $isAdmin = $_SESSION['user']['role_name'] === 'Admin';
+
+        if (!$isMember && !$isAdmin) {
+            ResponseFormatter::error('You are not a member of this community', 403);
+            return;
+        }
+
+        // Format Foto
+        $config = require BASE_PATH . '/config/app.php';
+        $forum['profile_picture_url'] = $forum['profile_picture']
+            ? $config['storage_url'] . $forum['profile_picture']
+            : null;
+
+        // 2. Format Media/Lampiran Forum (INI YANG BARU)
+        $forum['media_url'] = $forum['path_to_media']
+            ? $config['storage_url'] . $forum['path_to_media']
+            : null;
+
+        ResponseFormatter::success($forum, "Forum detail fetched");
+    }
+
+    public function showById($id) {
         $forumModel = new Forum();
         $forum = $forumModel->findById($id, $_SESSION['user_id']);
 
@@ -126,7 +161,7 @@ class ForumController {
 
     public function update($id) {
         $forumModel = new Forum();
-        $forumData = $forumModel->findById($id); // Ambil data lama
+        $forumData = $forumModel->findById($id, $_SESSION['user_id']); // Ambil data lama
 
         if (!$forumData) {
             ResponseFormatter::error('Forum not found', 404);
@@ -199,7 +234,7 @@ class ForumController {
 
         // 5. Kembalikan Data Terbaru (PENTING untuk Frontend Vue)
         // Agar Vue bisa langsung update UI tanpa reload halaman
-        $updatedForum = $forumModel->findById($id); // Ambil data segar setelah update
+        $updatedForum = $forumModel->findById($id, $_SESSION['user_id']); // Ambil data segar setelah update
 
         // Format Foto
         $config = require BASE_PATH . '/config/app.php';
@@ -217,10 +252,22 @@ class ForumController {
 
     public function delete($id) {
         $forumModel = new Forum();
-        $forumData = $forumModel->findById($id);
+        $forumData = $forumModel->findById($id, $_SESSION['user_id']);
+
         if (!$forumData) {
             ResponseFormatter::error('Forum not found', 404);
         }
+
+        $respondModel = new ForumRespond();
+        $respondIds = $respondModel->getRespondIdsByForumId((int)$id);
+
+        $reportModel = new Report();
+        $reportModel->deleteByTarget('FORUM', (int)$id);
+
+        if (!empty($respondIds)) {
+            $reportModel->deleteByTargets('FORUM_RESPOND', $respondIds);
+        }
+
         $deleteForum = $forumModel->delete($id);
         if (!$deleteForum) {
             ResponseFormatter::error('Failed to delete forum', 500);

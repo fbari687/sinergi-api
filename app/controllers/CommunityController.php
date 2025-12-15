@@ -3,13 +3,18 @@
 namespace app\controllers;
 
 use app\helpers\FileHelper;
+use app\models\Comment;
 use app\models\Community;
 use app\helpers\ResponseFormatter;
 use app\models\CommunityMember;
+use app\models\Forum;
+use app\models\ForumRespond;
 use app\models\Notification; // Import Model Notification
 
 require BASE_PATH . '/vendor/autoload.php';
 
+use app\models\Post;
+use app\models\Report;
 use app\models\User;
 use HTMLPurifier;
 use HTMLPurifier_Config;
@@ -190,21 +195,79 @@ class CommunityController
     public function delete($slug)
     {
         $communityModel = new Community();
+        $postModel = new Post();
+        $commentModel = new Comment();
+        $forumModel = new Forum();
+        $respondModel = new ForumRespond();
+        $reportModel = new Report();
 
-        $communityData = $communityModel->findBySlug($slug);
-        if (!$communityData) {
+        // 1. Ambil community ID
+        $communityId = $communityModel->findIdBySlug($slug);
+        if (!$communityId) {
             ResponseFormatter::error('Community not found', 404);
         }
 
-        $community = $communityModel->delete($slug);
-        if (!$community) {
-            ResponseFormatter::error('Failed to delete community', 500);
-        } else {
-            FileHelper::delete($communityData['path_to_thumbnail']);
-            ResponseFormatter::Success($community, 'Community deleted successfully');
+        $communityData = $communityModel->findById($communityId);
+
+        // === CLEANUP REPORT (HIERARKIS) ===
+
+        // 2. Ambil semua POST ID di community
+        $postIds = $postModel->getPostIdsByCommunityId($communityId);
+
+        // 3. Dari post, ambil semua COMMENT ID
+        $commentIds = [];
+        if (!empty($postIds)) {
+            foreach ($postIds as $postId) {
+                $ids = $commentModel->getCommentIdsByPostId($postId);
+                $commentIds = array_merge($commentIds, $ids);
+            }
         }
 
+        // 4. Ambil semua FORUM ID di community
+        $forumIds = $forumModel->getForumIdsByCommunityId($communityId);
+
+        // 5. Dari forum, ambil semua FORUM RESPOND ID
+        $forumRespondIds = [];
+        if (!empty($forumIds)) {
+            foreach ($forumIds as $forumId) {
+                $ids = $respondModel->getRespondIdsByForumId($forumId);
+                $forumRespondIds = array_merge($forumRespondIds, $ids);
+            }
+        }
+
+        // 6. Hapus REPORT berdasarkan hierarchy
+        $reportModel->deleteByTarget('COMMUNITY', $communityId);
+
+        if (!empty($postIds)) {
+            $reportModel->deleteByTargets('POST', $postIds);
+        }
+
+        if (!empty($commentIds)) {
+            $reportModel->deleteByTargets('COMMENT', $commentIds);
+        }
+
+        if (!empty($forumIds)) {
+            $reportModel->deleteByTargets('FORUM', $forumIds);
+        }
+
+        if (!empty($forumRespondIds)) {
+            $reportModel->deleteByTargets('FORUM_RESPOND', $forumRespondIds);
+        }
+
+        // === DELETE COMMUNITY (CASCADE) ===
+        $deleted = $communityModel->delete($slug);
+        if (!$deleted) {
+            ResponseFormatter::error('Failed to delete community', 500);
+        }
+
+        // === DELETE THUMBNAIL ===
+        if (!empty($communityData['path_to_thumbnail'])) {
+            FileHelper::delete($communityData['path_to_thumbnail']);
+        }
+
+        ResponseFormatter::success(null, 'Community deleted successfully');
     }
+
 
     public function join($slug)
     {
@@ -414,6 +477,57 @@ class CommunityController
             return $community;
         }, $communities);
         ResponseFormatter::success($formattedCommunities, 'Recommended communities fetched successfully');
+    }
+
+    public function getAllCommunities()
+    {
+        // 1. Ambil Parameter
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        $keyword = $_GET['q'] ?? '';
+        $sort = $_GET['sort'] ?? 'newest'; // newest, oldest, most_members, least_members
+
+        if ($page < 1) $page = 1;
+        $offset = ($page - 1) * $limit;
+
+        $communityModel = new Community();
+
+        // 2. Ambil Data & Total Count
+        $communities = $communityModel->getAllWithPagination($keyword, $sort, $limit, $offset);
+        $totalItems = $communityModel->countAll($keyword);
+        $totalPages = ceil($totalItems / $limit);
+
+        // 3. Format Data (URL Thumbnail)
+        $config = require BASE_PATH . '/config/app.php';
+        $storageBaseUrl = $config['storage_url'];
+
+        $formattedCommunities = array_map(function ($community) use ($storageBaseUrl) {
+            if ($community['path_to_thumbnail']) {
+                $community['thumbnail_url'] = $storageBaseUrl . $community['path_to_thumbnail'];
+            } else {
+                $community['thumbnail_url'] = null;
+            }
+            unset($community['path_to_thumbnail']);
+
+            // Casting
+            $community['total_members'] = (int)$community['total_members'];
+            $community['is_public'] = (bool)$community['is_public'];
+
+            return $community;
+        }, $communities);
+
+        // 4. Return Response dengan Meta Pagination
+        $response = [
+            'data' => $formattedCommunities,
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $limit,
+                'total_items' => $totalItems,
+                'total_pages' => $totalPages
+            ]
+        ];
+
+        ResponseFormatter::success($response, 'Communities fetched successfully');
     }
 
     public function getMembers($slug)
@@ -866,6 +980,107 @@ class CommunityController
             ResponseFormatter::success(null, 'Permintaan pembuatan akun terkirim. Menunggu persetujuan Admin Sinergi.');
         } else {
             ResponseFormatter::error('Gagal membuat permintaan.', 500);
+        }
+    }
+
+    public function getDashboardMetrics($slug)
+    {
+        // 1. Ambil Parameter Period dari Query String
+        $period = $_GET['period'] ?? '7_days'; // 7_days, 30_days, this_month
+
+        // 2. Tentukan Rentang Tanggal (Format PostgreSQL Timestamp)
+        $endDate = date('Y-m-d 23:59:59');
+        $startDate = date('Y-m-d 00:00:00', strtotime('-6 days')); // Default
+
+        // Rentang waktu periode sebelumnya (untuk menghitung % perubahan)
+        $prevEndDate = date('Y-m-d 23:59:59', strtotime('-7 days'));
+        $prevStartDate = date('Y-m-d 00:00:00', strtotime('-13 days'));
+
+        if ($period === '30_days') {
+            $startDate = date('Y-m-d 00:00:00', strtotime('-29 days'));
+
+            $prevEndDate = date('Y-m-d 23:59:59', strtotime('-30 days'));
+            $prevStartDate = date('Y-m-d 00:00:00', strtotime('-59 days'));
+        } elseif ($period === 'this_month') {
+            $startDate = date('Y-m-01 00:00:00');
+
+            // Previous month calculation
+            $prevStartDate = date('Y-m-01 00:00:00', strtotime('first day of last month'));
+            $prevEndDate = date('Y-m-t 23:59:59', strtotime('last day of last month'));
+        }
+
+        // 3. Validasi Komunitas
+        $communityModel = new Community();
+        // Asumsi model punya method findBySlug
+        $communityId = $communityModel->findIdBySlug($slug);
+
+        if (!$communityId) {
+            ResponseFormatter::error(null, 'Community not found', 404);
+            return;
+        }
+
+        // 4. Panggil Logic Data Dashboard
+        try {
+            $dashboardData = $communityModel->getDashboardData(
+                $communityId,
+                $startDate,
+                $endDate,
+                $prevStartDate,
+                $prevEndDate
+            );
+
+            ResponseFormatter::success($dashboardData, 'Dashboard data fetched successfully');
+        } catch (Exception $e) {
+            ResponseFormatter::error(null, $e->getMessage(), 500);
+        }
+    }
+
+    public function getLeaderboard($slug)
+    {
+        // 1. Ambil Parameter Period
+        $period = $_GET['period'] ?? 'this_month'; // Default bulan ini agar leaderboard relevan
+
+        // 2. Tentukan Rentang Tanggal
+        $endDate = date('Y-m-d 23:59:59');
+        $startDate = date('Y-m-d 00:00:00', strtotime('-6 days'));
+
+        if ($period === '7_days') {
+            $startDate = date('Y-m-d 00:00:00', strtotime('-6 days'));
+        } elseif ($period === '30_days') {
+            $startDate = date('Y-m-d 00:00:00', strtotime('-29 days'));
+        } elseif ($period === 'this_month') {
+            $startDate = date('Y-m-01 00:00:00');
+        } elseif ($period === 'all_time') {
+            $startDate = date('2000-01-01 00:00:00'); // Tanggal jauh di masa lalu
+        }
+
+        // 3. Validasi Komunitas
+        $communityModel = new Community();
+        $communityId = $communityModel->findIdBySlug($slug);
+
+        if (!$communityId) {
+            ResponseFormatter::error(null, 'Community not found', 404);
+            return;
+        }
+
+        $community = $communityModel->findById($communityId);
+
+        // 4. Ambil Data
+        try {
+            $leaderboard = $communityModel->getLeaderboardData($communityId, $startDate, $endDate);
+
+            $config = require BASE_PATH . '/config/app.php';
+            $storageBaseUrl = $config['storage_url'];
+
+            $formattedMemberLeaderBoard = $this->formatMemberData($leaderboard, $storageBaseUrl);
+
+            ResponseFormatter::success([
+                'community_name' => $community['name'],
+                'period' => $period,
+                'leaderboard' => $formattedMemberLeaderBoard
+            ], 'Leaderboard fetched successfully');
+        } catch (Exception $e) {
+            ResponseFormatter::error(null, $e->getMessage(), 500);
         }
     }
 

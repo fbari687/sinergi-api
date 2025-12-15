@@ -166,4 +166,14 @@ class ForumRespond {
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
     }
+
+    public function getRespondIdsByForumId(int $forumId): array
+    {
+        $query = "SELECT id FROM {$this->table} WHERE forum_id = :forum_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':forum_id', $forumId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
 }

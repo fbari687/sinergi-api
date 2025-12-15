@@ -33,7 +33,7 @@ class CommentOwnerOrAdminMiddleware {
         }
 
         if ($_SESSION['user']['role_name'] === 'Admin') {
-            exit();
+            return;
         } else {
             $commentUserId = $commentData['user_id'];
 
