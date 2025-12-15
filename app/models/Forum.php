@@ -82,6 +82,7 @@ class Forum {
         $query = "SELECT 
                     f.*, 
                     u.fullname, u.username, u.path_to_profile_picture as profile_picture,
+                    r.name as role_name,
                     c.slug as community_slug, c.id as community_id,
                     -- Hitung Total Vote (SUM dari 1 dan -1)
                 (SELECT COALESCE(SUM(reaction), 0) 
@@ -94,6 +95,7 @@ class Forum {
                  WHERE forum_id = f.id AND user_id = :user_id) as user_vote
                   FROM {$this->table} f
                   JOIN users u ON f.user_id = u.id
+                      LEFT JOIN roles r ON u.role_id = r.id
                   JOIN communities c ON f.community_id = c.id
                   WHERE f.id = :id";
 

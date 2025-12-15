@@ -126,44 +126,93 @@ class ForumController {
 
     public function update($id) {
         $forumModel = new Forum();
-        $forumData = $forumModel->findById($id);
+        $forumData = $forumModel->findById($id); // Ambil data lama
+
         if (!$forumData) {
             ResponseFormatter::error('Forum not found', 404);
+            return;
         }
 
         $data = $_POST;
+        // Validasi Title dan Description
         if (!isset($data['title']) || !isset($data['description'])) {
-            ResponseFormatter::error('Incomplete data', 400);
+            ResponseFormatter::error('Incomplete data. Title and description are required.', 400);
+            return;
         }
 
-        if (isset($_FILES['media']) && $_FILES['media']['error'] === 0) {
+        // 1. Sanitasi Deskripsi menggunakan HTMLPurifier (Sama seperti PostController)
+        // Ini penting agar user tidak bisa menyisipkan script berbahaya di deskripsi forum
+        $config = HTMLPurifier_Config::createDefault();
+        $purifier = new HTMLPurifier($config);
+        $safeHtmlDescription = $purifier->purify($data['description']);
+
+        // 2. Logika Media (Gambar)
+
+        // Default: Gunakan path lama jika tidak ada perubahan
+        $finalMediaPath = $forumData['path_to_media'];
+
+        // Cek A: Apakah user menghapus gambar di frontend? (Flag 'delete_media')
+        if (isset($data['delete_media']) && $data['delete_media'] === 'true') {
+            // Hapus file fisik lama jika ada
             if ($forumData['path_to_media']) {
+                FileHelper::delete($forumData['path_to_media']);
+            }
+            $finalMediaPath = null; // Set database jadi NULL
+        }
+
+        // Cek B: Apakah user mengupload file BARU? (Replace)
+        if (isset($_FILES['media']) && $_FILES['media']['error'] === 0) {
+            // Hapus file lama fisik jika ada (dan belum dihapus di langkah A)
+            if ($forumData['path_to_media'] && $finalMediaPath !== null) {
                 FileHelper::delete($forumData['path_to_media']);
             }
 
             $uploadedPath = FileHelper::upload(
                 $_FILES['media'],
-                'uploads/forum_media',
+                'uploads/forum_media', // Folder upload
                 ['image/jpeg', 'image/png', 'image/jpg'],
-                5 * 1024 * 1024
+                5 * 1024 * 1024 // 5MB
             );
 
             if (!$uploadedPath) {
                 ResponseFormatter::error('Failed to upload media', 500);
+                return;
             }
+
+            $finalMediaPath = $uploadedPath;
         }
 
+        // 3. Susun Data Update
         $dataForum = [
-            'title' => strip_tags($data['title']),
-            'description' => $data['description'],
-            'path_to_media' => $uploadedPath ?? $forumData['path_to_media'],
+            'title' => strip_tags($data['title']), // Title tetap pakai strip_tags biasa
+            'description' => $safeHtmlDescription, // Description pakai hasil HTMLPurifier
+            'path_to_media' => $finalMediaPath,    // Hasil logika media di atas
         ];
 
-        $forum = $forumModel->update($dataForum, $id);
-        if (!$forum) {
+        // 4. Lakukan Update Database
+        $updateResult = $forumModel->update($dataForum, $id);
+
+        if (!$updateResult) {
             ResponseFormatter::error('Failed to update forum', 500);
+            return;
         }
-        ResponseFormatter::success(null, 'Forum updated successfully');
+
+        // 5. Kembalikan Data Terbaru (PENTING untuk Frontend Vue)
+        // Agar Vue bisa langsung update UI tanpa reload halaman
+        $updatedForum = $forumModel->findById($id); // Ambil data segar setelah update
+
+        // Format Foto
+        $config = require BASE_PATH . '/config/app.php';
+        $updatedForum['profile_picture_url'] = $updatedForum['profile_picture']
+            ? $config['storage_url'] . $updatedForum['profile_picture']
+            : null;
+
+        // 2. Format Media/Lampiran Forum (INI YANG BARU)
+        $updatedForum['media_url'] = $updatedForum['path_to_media']
+            ? $config['storage_url'] . $updatedForum['path_to_media']
+            : null;
+
+        ResponseFormatter::success($updatedForum, 'Forum updated successfully');
     }
 
     public function delete($id) {

@@ -218,6 +218,148 @@ class AuthController
         }
     }
 
+    public function requestForgotPasswordOtp()
+    {
+        $data = $_POST;
+
+        if (!isset($data['email'])) {
+            ResponseFormatter::error('Email is required', 400);
+            return;
+        }
+
+        $email = strip_tags($data['email']);
+
+        // 1. Cek apakah email TERDAFTAR (Kebalikan dari register)
+        $userModel = new User();
+        $user = $userModel->findByEmail($email);
+
+        if (!$user) {
+            // Demi keamanan, message bisa dibuat umum "If email exists, OTP sent".
+            // Tapi untuk development/UX yang jelas, kita pakai 404.
+            ResponseFormatter::error('Email not found.', 404);
+            return;
+        }
+
+        // 2. Generate OTP
+        $otpCode = rand(100000, 999999);
+
+        $otpModel = new Otp();
+        // Hapus OTP lama jika ada, lalu buat baru
+        $otpModel->deleteByEmail($email);
+        $otpModel->create($email, $otpCode);
+
+        // 3. Kirim Email
+        // Kita ambil username dari database user untuk personalisasi email
+        $username = $user['username'];
+        $emailSent = MailHelper::sendOtp($email, $username, $otpCode);
+
+        if (!$emailSent) {
+            ResponseFormatter::error('Failed to send OTP email', 500);
+            return;
+        }
+
+        // 4. Simpan state di session untuk langkah selanjutnya
+        $_SESSION['forgot_password_email'] = $email;
+        $_SESSION['forgot_password_verified'] = false; // Reset status verifikasi
+
+        ResponseFormatter::success(null, 'OTP for password reset has been sent to your email');
+    }
+
+    public function verifyForgotPasswordOtp()
+    {
+        $data = $_POST;
+
+        if (!isset($data['otp_code'])) {
+            ResponseFormatter::error('OTP code is required', 400);
+            return;
+        }
+
+        // Pastikan flow dimulai dari request OTP (Session harus ada)
+        if (!isset($_SESSION['forgot_password_email'])) {
+            ResponseFormatter::error('Session expired. Please request OTP again.', 400);
+            return;
+        }
+
+        $email = $_SESSION['forgot_password_email'];
+        $otpCode = $data['otp_code'];
+
+        $otpModel = new Otp();
+        $otpData = $otpModel->findByEmail($email);
+
+        // Validasi OTP
+        if (!$otpData || $otpData['otp_code'] !== $otpCode) {
+            ResponseFormatter::error('Invalid OTP Code', 400);
+            return;
+        }
+
+        // Validasi Expiry
+        if (time() > $otpData['expires_at']) {
+            ResponseFormatter::error('OTP Code has expired', 400);
+            return;
+        }
+
+        // Tandai di session bahwa user ini SUDAH lolos verifikasi OTP
+        $_SESSION['forgot_password_verified'] = true;
+
+        // Hapus OTP bekas pakai agar tidak bisa dipakai ulang (Replay Attack protection)
+        $otpModel->deleteByEmail($email);
+
+        ResponseFormatter::success(null, 'OTP verified. You can now reset your password.');
+    }
+
+    public function resetPassword()
+    {
+        $data = $_POST;
+
+        if (!isset($data['new_password']) || !isset($data['confirm_password'])) {
+            ResponseFormatter::error('New password and confirmation are required', 400);
+            return;
+        }
+
+        // 1. Keamanan: Cek apakah user sudah melewati tahap verifikasi OTP
+        if (!isset($_SESSION['forgot_password_verified']) || $_SESSION['forgot_password_verified'] !== true) {
+            ResponseFormatter::error('Unauthorized. Please verify OTP first.', 403);
+            return;
+        }
+
+        if (!isset($_SESSION['forgot_password_email'])) {
+            ResponseFormatter::error('Session expired.', 400);
+            return;
+        }
+
+        $newPassword = $data['new_password'];
+        $confirmPassword = $data['confirm_password'];
+
+        // 2. Validasi Password
+        if (strlen($newPassword) < 8) {
+            ResponseFormatter::error('Password must be at least 8 characters long', 400);
+            return;
+        }
+
+        if ($newPassword !== $confirmPassword) {
+            ResponseFormatter::error('Password confirmation does not match', 400);
+            return;
+        }
+
+        // 3. Update Password di Database
+        $email = $_SESSION['forgot_password_email'];
+        $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
+
+        $userModel = new User();
+        // Asumsi: Anda perlu menambahkan method updatePasswordByEmail di model User
+        $updated = $userModel->updatePasswordByEmail($email, $hashedPassword);
+
+        if ($updated) {
+            // 4. Bersihkan Session
+            unset($_SESSION['forgot_password_email']);
+            unset($_SESSION['forgot_password_verified']);
+
+            ResponseFormatter::success(null, 'Password has been reset successfully. Please login.');
+        } else {
+            ResponseFormatter::error('Failed to reset password', 500);
+        }
+    }
+
     public function logout()
     {
         // 1. Hapus semua variabel sesi

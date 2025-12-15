@@ -3,6 +3,7 @@
 namespace app\models;
 
 use app\core\Database;
+use PDO;
 
 class ForumRespond {
     private $conn;
@@ -28,10 +29,31 @@ class ForumRespond {
         return false;
     }
 
-    public function getAnswersByForumId($forumId, $currentUserId = null) {
+    public function getAnswersByForumId($forumId, $currentUserId = null, $sort = 'top', $limit = 10, $offset = 0) {
+        // 1. Tentukan Logic Sorting
+        // NOTE: fr.is_accepted DESC selalu ditaruh paling awal agar solusi tetap di atas (Pinned)
+        $orderBy = "";
+
+        switch ($sort) {
+            case 'newest':
+                // Terbaru: Solusi -> Tanggal Dibuat (Baru ke Lama)
+                $orderBy = "fr.is_accepted DESC, fr.created_at DESC";
+                break;
+            case 'oldest':
+                // Terlama: Solusi -> Tanggal Dibuat (Lama ke Baru)
+                $orderBy = "fr.is_accepted DESC, fr.created_at ASC";
+                break;
+            case 'top':
+            default:
+                // Vote Terbanyak: Solusi -> Jumlah Vote -> Tanggal (Lama ke Baru)
+                $orderBy = "fr.is_accepted DESC, vote_count DESC, fr.created_at ASC";
+                break;
+        }
+
         $query = "SELECT 
                 fr.*,
                 u.fullname, u.username, u.path_to_profile_picture as profile_picture,
+                r.name as role_name,
                 
                 -- Hitung Total Vote per Jawaban
                 (SELECT COALESCE(SUM(reaction), 0) 
@@ -45,18 +67,30 @@ class ForumRespond {
 
               FROM {$this->table} fr
               JOIN users u ON fr.user_id = u.id
+              LEFT JOIN roles r ON u.role_id = r.id
               WHERE fr.forum_id = :forum_id 
                 AND fr.parent_id IS NULL 
-              ORDER BY 
-                fr.is_accepted DESC,  -- 1. Solusi terpilih paling atas
-                vote_count DESC,      -- 2. Vote tertinggi kedua
-                fr.created_at ASC";
+              ORDER BY {$orderBy}
+              LIMIT :limit OFFSET :offset";
 
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':forum_id', $forumId);
-        $stmt->bindParam(':user_id', $currentUserId);
+        $stmt->bindValue(':forum_id', $forumId);
+        $stmt->bindValue(':user_id', $currentUserId);
+        // Gunakan bindValue dengan PARAM_INT untuk limit & offset
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+
         $stmt->execute();
         return $stmt->fetchAll();
+    }
+
+    public function countByForumId($forumId) {
+        $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE forum_id = :forum_id AND parent_id IS NULL";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindValue(':forum_id', $forumId);
+        $stmt->execute();
+        $result = $stmt->fetch();
+        return $result ? $result['total'] : 0;
     }
 
     public function getRepliesByParentId($parentId) {
@@ -117,10 +151,11 @@ class ForumRespond {
 
     public function update($id, $data) {
         $is_edited = true;
-        $query = "UPDATE {$this->table} SET message = :message, is_edited = :is_edited WHERE id = :id";
+        $query = "UPDATE {$this->table} SET message = :message, path_to_media = :path_to_media, is_edited = :is_edited WHERE id = :id";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id);
         $stmt->bindParam(':message', $data['message']);
+        $stmt->bindParam(':path_to_media', $data['path_to_media']);
         $stmt->bindParam(':is_edited', $is_edited);
         return $stmt->execute();
     }

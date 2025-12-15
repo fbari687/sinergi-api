@@ -19,13 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     http_response_code(200);
     exit();
 }
-
-spl_autoload_register(function ($class) {
-    $path = BASE_PATH . '/' . str_replace('\\', '/', $class) . '.php';
-    if (file_exists($path)) {
-        require $path;
-    }
-});
+//
+//spl_autoload_register(function ($class) {
+//    $path = BASE_PATH . '/' . str_replace('\\', '/', $class) . '.php';
+//    if (file_exists($path)) {
+//        require $path;
+//    }
+//});
 
 
 // === INISIALISASI SESI KUSTOM ===

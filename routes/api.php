@@ -16,6 +16,10 @@ function register_routes(Router $router)
         ['Authenticate']
     );
 
+    $router->addRoute('POST', 'api/forgot-password/request', 'AuthController@requestForgotPasswordOtp');
+    $router->addRoute('POST', 'api/forgot-password/verify', 'AuthController@verifyForgotPasswordOtp');
+    $router->addRoute('POST', 'api/forgot-password/reset', 'AuthController@resetPassword');
+
     // Rute User (dengan middleware 'Authenticate')
     $router->addRoute('GET', 'api/users', 'UserController@index',
         ['Authenticate', 'Role:Admin,Dosen']

@@ -90,6 +90,18 @@ class User {
         return $stmt->fetchColumn();
     }
 
+    public function updatePasswordByEmail($email, $hashedPassword)
+    {
+        // Query SQL standar untuk update password
+        $query = "UPDATE users SET password = :password WHERE email = :email";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':password', $hashedPassword);
+        $stmt->bindParam(':email', $email);
+
+        return $stmt->execute();
+    }
+
     // [BARU] Method untuk update data profil user
     public function update($id, $data) {
         $fields = [];
