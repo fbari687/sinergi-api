@@ -4,6 +4,7 @@ namespace app\models;
 
 use app\core\Database;
 use PDOException;
+use PDO;
 
 class CommunityMember
 {
@@ -57,28 +58,39 @@ class CommunityMember
         return $stmt->fetch();
     }
 
-    public function getCommunitiesByUserId($userId)
+    public function getCommunitiesByUserId(int $userId, ?int $limit = null)
     {
-        // PERUBAHAN:
-        // 1. Tambahkan 'cm.role AS current_user_role' di SELECT
-        // 2. Tambahkan 'cm.role' di GROUP BY (Wajib untuk database strict seperti PostgreSQL/SQL Server)
+        $sql = "
+        SELECT 
+            c.slug,
+            c.name,
+            c.path_to_thumbnail,
+            c.is_public,
+            cm.role AS current_user_role,
+            COUNT(all_members.id) AS total_members
+        FROM {$this->table} cm
+        JOIN communities c ON cm.community_id = c.id
+        JOIN community_members all_members 
+            ON all_members.community_id = c.id 
+           AND all_members.status = 'GRANTED'
+        WHERE cm.user_id = :user_id 
+          AND cm.status = 'GRANTED'
+        GROUP BY c.id, c.slug, c.name, c.path_to_thumbnail, c.is_public, cm.role
+        ORDER BY c.created_at DESC
+    ";
 
-        $query = "
-                SELECT 
-                    c.slug, 
-                    c.name, 
-                    c.path_to_thumbnail, 
-                    c.is_public, 
-                    cm.role AS current_user_role, 
-                    COUNT(all_members.id) AS total_members
-                FROM {$this->table} cm
-                JOIN communities c ON cm.community_id = c.id
-                JOIN community_members all_members ON all_members.community_id = c.id AND all_members.status = 'GRANTED'
-                WHERE cm.user_id = :user_id AND cm.status = 'GRANTED'
-                GROUP BY c.id, c.slug, c.name, c.path_to_thumbnail, c.is_public, cm.role";
+        // Tambahkan LIMIT hanya jika ada
+        if ($limit !== null) {
+            $sql .= " LIMIT :limit";
+        }
 
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':user_id', $userId);
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        }
+
         $stmt->execute();
         return $stmt->fetchAll();
     }

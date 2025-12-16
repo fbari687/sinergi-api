@@ -317,9 +317,9 @@ function register_routes(Router $router)
     // Admin user management
     $router->addRoute('POST', 'api/admin/users', 'AdminUserController@createUser', ['Authenticate', 'Role:Admin']);
     $router->addRoute('GET',  'api/admin/users', 'AdminUserController@listUsers', ['Authenticate', 'Role:Admin']);
-    $router->addRoute('POST', 'api/admin/users/{id}/role', 'AdminUserController@updateUserRole', ['Authenticate', 'Role:Admin']);
+    $router->addRoute('POST', 'api/admin/users/{id}/update', 'AdminUserController@updateUser', ['Authenticate', 'Role:Admin']);
     $router->addRoute('POST', 'api/admin/users/{id}/toggle-active', 'AdminUserController@toggleActive', ['Authenticate', 'Role:Admin']);
-    $router->addRoute('DELETE', 'api/admin/users/{id}', 'AdminUserController@deleteUser', ['Authenticate', 'Role:Admin']);
+    $router->addRoute('POST', 'api/admin/users/{id}/delete', 'AdminUserController@deleteUser', ['Authenticate', 'Role:Admin']);
     $router->addRoute('POST', 'api/admin/users/promote-to-alumni', 'AdminUserController@promoteToAlumni', [
         'Authenticate',
         'Role:Admin'

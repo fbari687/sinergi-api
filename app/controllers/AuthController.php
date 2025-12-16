@@ -62,7 +62,7 @@ class AuthController
         $_SESSION['registration_data'] = [
             'username' => strip_tags($data['username']),
             'email' => strip_tags($data['email']),
-            'password' => strip_tags($data['password'])
+            'password' => $data['password']
         ];
 
         ResponseFormatter::success(null, 'OTP has been sent to your email');
@@ -160,14 +160,14 @@ class AuthController
     {
         $data = $_POST;
 
-//         if (!isset($data['captcha_code']) || !isset($_SESSION['code'])) {
-//            ResponseFormatter::error('Captcha code is required', 400);
-//         }
-//
-//         if ($data['captcha_code'] !== $_SESSION['code']) {
-//            unset($_SESSION['code']);
-//            ResponseFormatter::error('Invalid captcha code', 400);
-//         }
+         if (!isset($data['captcha_code']) || !isset($_SESSION['code'])) {
+            ResponseFormatter::error('Captcha code is required', 400);
+         }
+
+         if ($data['captcha_code'] !== $_SESSION['code']) {
+            unset($_SESSION['code']);
+            ResponseFormatter::error('Invalid captcha code', 400);
+         }
 
         unset($_SESSION['code']);
 
@@ -177,13 +177,17 @@ class AuthController
         }
 
         $email = strip_tags($data['email']);
-        $password = strip_tags($data['password']);
+        $password = $data['password'];
 
         $userModel = new User();
         // findByEmail sudah melakukan JOIN ke roles, sehingga mengembalikan kolom 'role'
         $user = $userModel->findByEmail($email);
 
         if ($user && password_verify($password, $user['password'])) {
+            if ($user['is_active'] !== true) {
+                ResponseFormatter::error('Akun anda tidak aktif. Hubungi admin untuk informasi lebih lanjut.', 403);
+            }
+
             // Regenerasi ID sesi untuk keamanan (mencegah session fixation)
             session_regenerate_id(true);
 

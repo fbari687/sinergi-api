@@ -397,25 +397,32 @@ class CommunityController
     public function getCommunityJoinedByUserId()
     {
         $config = require BASE_PATH . '/config/app.php';
-
         $storageBaseUrl = $config['storage_url'];
 
         $userId = $_SESSION['user_id'];
+
+        // Ambil limit dari query string (?limit=5)
+        $limit = filter_input(INPUT_GET, 'limit', FILTER_VALIDATE_INT);
+        if ($limit !== null && $limit <= 0) {
+            $limit = null; // fallback aman
+        }
+
         $communityMemberModel = new CommunityMember();
-        $communities = $communityMemberModel->getCommunitiesByUserId($userId);
+        $communities = $communityMemberModel->getCommunitiesByUserId($userId, $limit);
 
         $formattedCommunities = array_map(function ($community) use ($storageBaseUrl) {
-            if ($community['path_to_thumbnail']) {
-                $community['thumbnail_url'] = $storageBaseUrl . $community['path_to_thumbnail'];
-            } else {
-                $community['thumbnail_url'] = null;
-            }
-            unset($community['path_to_thumbnail']);
+            $community['thumbnail_url'] = $community['path_to_thumbnail']
+                ? $storageBaseUrl . $community['path_to_thumbnail']
+                : null;
 
+            unset($community['path_to_thumbnail']);
             return $community;
         }, $communities);
 
-        ResponseFormatter::success($formattedCommunities, 'Communities joined by user fetched successfully');
+        ResponseFormatter::success(
+            $formattedCommunities,
+            'Communities joined by user fetched successfully'
+        );
     }
 
     public function search()
