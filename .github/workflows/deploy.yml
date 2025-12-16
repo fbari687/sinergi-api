@@ -26,7 +26,7 @@ jobs:
             git fetch --all
             git reset --hard origin/main
             git pull origin main
-            
+            ln -s /var/www/sinergi/storage/app/public/ /var/www/sinergi/public/
             chown -R www-data:www-data /var/www/sinergi
             
             # Restart Nginx/PHP agar perubahan terbaca (terkadang perlu)

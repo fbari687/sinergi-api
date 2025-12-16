@@ -518,4 +518,14 @@ class User {
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
+
+    public function updateEmailAndRole($userId, $newEmail, $newRoleId) {
+        $sql = "UPDATE users SET email = :email, role_id = :rid WHERE id = :uid";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':email' => $newEmail,
+            ':rid' => $newRoleId,
+            ':uid' => $userId
+        ]);
+    }
 }

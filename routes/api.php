@@ -19,6 +19,12 @@ function register_routes(Router $router)
     $router->addRoute('POST', 'api/forgot-password/request', 'AuthController@requestForgotPasswordOtp');
     $router->addRoute('POST', 'api/forgot-password/verify', 'AuthController@verifyForgotPasswordOtp');
     $router->addRoute('POST', 'api/forgot-password/reset', 'AuthController@resetPassword');
+    $router->addRoute('POST', 'api/auth/lifecycle/request-otp', 'AuthController@requestLifecycleOtp',
+        ['Authenticate']
+    );
+    $router->addRoute('POST', 'api/auth/lifecycle/verify-otp', 'AuthController@verifyLifecycleOtp',
+        ['Authenticate']
+    );
 
     // Rute User (dengan middleware 'Authenticate')
     $router->addRoute('GET', 'api/users', 'UserController@index',

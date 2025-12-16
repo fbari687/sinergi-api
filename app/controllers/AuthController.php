@@ -143,6 +143,13 @@ class AuthController
 
         // Masukkan status ke dalam array user agar Frontend tahu harus menampilkan dialog atau tidak
         $user['is_profile_complete'] = $isProfileComplete;
+
+        if ($roleName === 'Mahasiswa') {
+            $estYear = $userProfileModel->getStudentGraduationYear($user['id']);
+            // Masukkan ke array user agar terkirim ke frontend
+            $user['tahun_perkiraan_lulus'] = $estYear ?? null;
+        }
+
         $config = require BASE_PATH . '/config/app.php';
         $storageBaseUrl = $config['storage_url'];
         $user['profile_picture'] = $storageBaseUrl . $user['path_to_profile_picture'];
@@ -204,6 +211,12 @@ class AuthController
             $user['is_profile_complete'] = $isProfileComplete;
             // ----------------------------------
 
+            if ($roleName === 'Mahasiswa') {
+                $estYear = $userProfileModel->getStudentGraduationYear($user['id']);
+                // Masukkan ke array user agar terkirim ke frontend
+                $user['tahun_perkiraan_lulus'] = $estYear ?? null;
+            }
+
             $config = require BASE_PATH . '/config/app.php';
             $storageBaseUrl = $config['storage_url'];
             $user['profile_picture'] = $storageBaseUrl . $user['path_to_profile_picture'];
@@ -221,6 +234,172 @@ class AuthController
             ResponseFormatter::success($user, 'Login successful');
         } else {
             ResponseFormatter::error('Invalid credentials', 401);
+        }
+    }
+
+    public function requestLifecycleOtp()
+    {
+        // 1. Cek Login
+        if (!isset($_SESSION['user_id'])) {
+            ResponseFormatter::error('Unauthorized', 401);
+            return;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $type = $input['type'] ?? null;
+        $userId = $_SESSION['user_id'];
+        $userModel = new User();
+        $user = $userModel->findById($userId);
+
+        if (!$user) {
+            ResponseFormatter::error('User not found', 404);
+            return;
+        }
+
+        $emailTarget = "";
+        $context = "";
+
+        // 2. Tentukan Email Tujuan berdasarkan Tipe
+        if ($type === 'extend_student') {
+            // Kirim ke email kampus saat ini
+            $emailTarget = $user['email'];
+            $context = "Perpanjangan Masa Studi";
+
+        } elseif ($type === 'convert_alumni') {
+            // Validasi Email Baru
+            $newEmail = $input['new_email'] ?? '';
+
+            if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+                ResponseFormatter::error('Format email tidak valid', 400);
+                return;
+            }
+
+            // Pastikan bukan email kampus (pnj.ac.id)
+            if (str_ends_with($newEmail, 'pnj.ac.id')) {
+                ResponseFormatter::error('Gunakan email pribadi (Gmail/Yahoo/dll) untuk akun Alumni.', 400);
+                return;
+            }
+
+            // Cek apakah email sudah dipakai user lain
+            if ($userModel->findByEmail($newEmail)) {
+                ResponseFormatter::error('Email sudah digunakan oleh pengguna lain.', 409);
+                return;
+            }
+
+            $emailTarget = $newEmail;
+            $context = "Konversi Akun ke Alumni";
+        } else {
+            ResponseFormatter::error('Invalid request type', 400);
+            return;
+        }
+
+        // 3. Generate OTP
+        try {
+            $otpCode = random_int(100000, 999999);
+        } catch (\Exception $e) {
+            $otpCode = rand(100000, 999999);
+        }
+
+        // 4. Simpan OTP (Hapus yg lama dulu biar bersih)
+        $otpModel = new Otp();
+        $otpModel->deleteByEmail($emailTarget);
+        $otpModel->create($emailTarget, $otpCode);
+
+        // 5. Kirim Email
+        $sent = MailHelper::sendOtp($emailTarget, $user['username'], $otpCode, $context);
+
+        if ($sent) {
+            ResponseFormatter::success(null, 'OTP berhasil dikirim ke ' . $emailTarget);
+        } else {
+            ResponseFormatter::error('Gagal mengirim email OTP', 500);
+        }
+    }
+
+    /**
+     * [BARU] Verify OTP dan Eksekusi Perubahan
+     */
+    public function verifyLifecycleOtp()
+    {
+        if (!isset($_SESSION['user_id'])) {
+            ResponseFormatter::error('Unauthorized', 401);
+            return;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $type = $input['type'] ?? null;
+        $otpCode = $input['otp'] ?? '';
+        $userId = $_SESSION['user_id'];
+
+        // 1. Tentukan Email yang dicek OTP-nya
+        $emailToCheck = "";
+
+        $userModel = new User();
+        $currentUser = $userModel->findById($userId);
+
+        if ($type === 'extend_student') {
+            $emailToCheck = $currentUser['email'];
+        } elseif ($type === 'convert_alumni') {
+            $emailToCheck = $input['new_email'] ?? '';
+        } else {
+            ResponseFormatter::error('Invalid request type', 400);
+            return;
+        }
+
+        // 2. Verifikasi OTP
+        $otpModel = new Otp();
+        $otpData = $otpModel->findByEmail($emailToCheck);
+
+        if (!$otpData || $otpData['otp_code'] !== $otpCode) {
+            ResponseFormatter::error('Kode OTP Salah', 400);
+            return;
+        }
+        if (time() > $otpData['expires_at']) {
+            ResponseFormatter::error('Kode OTP Kadaluarsa', 400);
+            return;
+        }
+
+        // 3. Eksekusi Logic berdasarkan Tipe
+        $conn = Database::getInstance()->getConnection();
+        $conn->beginTransaction();
+
+        try {
+            if ($type === 'extend_student') {
+                // LOGIC A: Tambah 1 tahun di mahasiswa_profiles
+                $profileModel = new UserProfile();
+                $profileModel->extendStudentYear($userId);
+
+                $message = "Masa studi berhasil diperpanjang.";
+
+            } elseif ($type === 'convert_alumni') {
+                // LOGIC B: Konversi ke Alumni
+
+                // a. Ambil Role ID Alumni
+                $roleModel = new Role();
+                $alumniRoleId = $roleModel->findIdByName('Alumni'); // Pastikan ada method ini atau hardcode ID jika perlu
+                if (!$alumniRoleId) throw new \Exception("Role Alumni not found");
+
+                // b. Update User (Email & Role)
+                $userModel->updateEmailAndRole($userId, $emailToCheck, $alumniRoleId);
+
+                // c. Migrasi Profile (Mahasiswa -> Alumni)
+                $profileModel = new UserProfile();
+                $profileModel->migrateToAlumni($userId);
+
+                // d. Logout user (Hapus Session)
+                session_destroy();
+
+                $message = "Akun berhasil diubah menjadi Alumni. Silakan login ulang.";
+            }
+
+            // Hapus OTP setelah sukses
+            $otpModel->deleteByEmail($emailToCheck);
+
+            $conn->commit();
+            ResponseFormatter::success(null, $message);
+
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+            ResponseFormatter::error('Gagal memproses permintaan: ' . $e->getMessage(), 500);
         }
     }
 

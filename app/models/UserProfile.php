@@ -89,4 +89,40 @@ class UserProfile
             ':instansi_asal' => $data['instansi_asal'] ?? ''
         ]);
     }
+
+    public function extendStudentYear($userId) {
+        $sql = "UPDATE mahasiswa_profiles 
+                SET tahun_perkiraan_lulus = tahun_perkiraan_lulus + 1 
+                WHERE user_id = :uid";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':uid' => $userId]);
+    }
+
+    // [BARU] Migrasi data dari mahasiswa_profiles ke alumni_profiles
+    public function migrateToAlumni($userId) {
+        // 1. Ambil data mahasiswa lama (untuk nim, prodi, tahun_masuk - opsional jika alumni butuh)
+        // Disini kita asumsi buat profile alumni baru dengan tahun_lulus = tahun sekarang
+
+        $currentYear = date('Y');
+
+        // Insert ke alumni_profiles
+        // Sesuaikan kolom dengan tabel alumni_profiles Anda
+        $sqlInsert = "INSERT INTO alumni_profiles (user_id, tahun_lulus) VALUES (:uid, :thn)";
+        $stmt = $this->conn->prepare($sqlInsert);
+        $stmt->execute([':uid' => $userId, ':thn' => $currentYear]);
+
+        // 2. Hapus data di mahasiswa_profiles
+        $sqlDelete = "DELETE FROM mahasiswa_profiles WHERE user_id = :uid";
+        $stmtDel = $this->conn->prepare($sqlDelete);
+        $stmtDel->execute([':uid' => $userId]);
+    }
+
+    public function getStudentGraduationYear($userId) {
+        $sql = "SELECT tahun_perkiraan_lulus FROM mahasiswa_profiles WHERE user_id = :uid";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':uid' => $userId]);
+
+        // fetchColumn mengembalikan value tunggal atau false jika tidak ada
+        return $stmt->fetchColumn();
+    }
 }
