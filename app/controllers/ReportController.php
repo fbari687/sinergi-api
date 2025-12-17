@@ -238,6 +238,7 @@ class ReportController
                     'label' => $c['name'],
                     'type_label' => 'Komunitas',
                     'thumbnail' => $buildThumbnailUrl($c['path_to_thumbnail']),
+                    'slug' => $c['slug'] ?? ''
                 ];
 
             case 'POST':

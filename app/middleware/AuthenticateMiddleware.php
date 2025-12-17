@@ -20,6 +20,10 @@ class AuthenticateMiddleware {
                 session_destroy();
                 ResponseFormatter::error('Unauthorized', 401);
             }
+            if ($user['is_active'] === false) {
+                session_destroy();
+                ResponseFormatter::error('This account has been disabled', 403);
+            }
             // Simpan data user lengkap (termasuk nama role) ke sesi
             $config = require BASE_PATH . '/config/app.php';
             $storageBaseUrl = $config['storage_url'];

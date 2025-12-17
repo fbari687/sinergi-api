@@ -97,7 +97,7 @@ class AdminUserController
         ];
 
         // 2. Panggil Model
-        $result = $this->userModel->getUsersWithProfiles($perPage, $offset, $filters);
+        $result = $this->userModel->getUsersWithProfiles($perPage, $offset, $filters, true, $_SESSION['user_id']);
 
         // 3. Format Response (URL Processing)
         $config = require BASE_PATH . '/config/app.php';

@@ -1,19 +1,23 @@
 <?php
+
 namespace app\models;
 
 use app\core\Database;
 use PDO;
 
-class User {
+class User
+{
     private $conn;
     // Di Oracle, nama tabel dan kolom biasanya uppercase secara default
     private $table = 'users';
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->conn = Database::getInstance()->getConnection();
     }
 
-    public function findByEmail($email) {
+    public function findByEmail($email)
+    {
         $query = "SELECT u.id, fullname, username, email, bio, path_to_profile_picture, password, is_active, r.name AS role FROM {$this->table} u JOIN roles r ON role_id = r.id WHERE email = :email";
 
         $stmt = $this->conn->prepare($query);
@@ -23,7 +27,8 @@ class User {
     }
 
     // [BARU] Method ringan untuk cek username (dipakai di UserController::updateProfile)
-    public function findByUsername($username) {
+    public function findByUsername($username)
+    {
         $query = "SELECT id, username FROM {$this->table} WHERE username = :username LIMIT 1";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':username', $username);
@@ -31,8 +36,9 @@ class User {
         return $stmt->fetch();
     }
 
-    public function findById($id) {
-        $query = "SELECT u.id, fullname, username, email, bio, path_to_profile_picture, r.name AS role FROM {$this->table} u JOIN roles r ON u.role_id = r.id WHERE u.id = :id";
+    public function findById($id)
+    {
+        $query = "SELECT u.id, fullname, username, email, bio, path_to_profile_picture, is_active, r.name AS role FROM {$this->table} u JOIN roles r ON u.role_id = r.id WHERE u.id = :id";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id);
@@ -40,8 +46,9 @@ class User {
         return $stmt->fetch();
     }
 
-    public function findByIdWithRole($id) {
-        $query = "SELECT u.id, fullname, username, email, bio, path_to_profile_picture, r.name AS role_name FROM {$this->table} u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = :id";
+    public function findByIdWithRole($id)
+    {
+        $query = "SELECT u.id, fullname, username, email, bio, path_to_profile_picture, is_active, r.name AS role_name FROM {$this->table} u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = :id";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id);
@@ -49,7 +56,8 @@ class User {
         return $stmt->fetch();
     }
 
-    public function getAll() {
+    public function getAll()
+    {
         $query = "SELECT u.id, fullname, username, email, bio, path_to_profile_picture, r.name AS role FROM {$this->table} u JOIN roles r ON role_id = r.id";
 
         $stmt = $this->conn->prepare($query);
@@ -57,7 +65,8 @@ class User {
         return $stmt->fetchAll();
     }
 
-    public function create($fullname, $username, $bio, $email, $password, $profilePicture, $role) {
+    public function create($fullname, $username, $bio, $email, $password, $profilePicture, $role)
+    {
         // Menggunakan klausa RETURNING ID INTO :last_id untuk mendapatkan ID yang baru dibuat
 
         $query = "SELECT id FROM roles WHERE name = :role";
@@ -104,7 +113,8 @@ class User {
     }
 
     // [BARU] Method untuk update data profil user
-    public function update($id, $data) {
+    public function update($id, $data)
+    {
         $fields = [];
         foreach ($data as $key => $value) {
             $fields[] = "$key = :$key";
@@ -148,10 +158,10 @@ class User {
         // Mapping Role ke Nama Tabel
         $tableMap = [
             'Mahasiswa' => 'mahasiswa_profiles',
-            'Dosen'     => 'dosen_profiles',
-            'Alumni'    => 'alumni_profiles',
-            'Mitra'     => 'mitra_profiles',    // Ditambahkan
-            'Pakar'     => 'pakar_profiles'     // Ditambahkan
+            'Dosen' => 'dosen_profiles',
+            'Alumni' => 'alumni_profiles',
+            'Mitra' => 'mitra_profiles',    // Ditambahkan
+            'Pakar' => 'pakar_profiles'     // Ditambahkan
         ];
 
         if (isset($tableMap[$role])) {
@@ -171,7 +181,8 @@ class User {
         return $user;
     }
 
-    public function searchCandidatesForCommunity($keyword, $communityId) {
+    public function searchCandidatesForCommunity($keyword, $communityId)
+    {
         // Menggunakan ILIKE untuk PostgreSQL (Case Insensitive).
         // Ganti ke LIKE jika menggunakan MySQL.
         $query = "SELECT id, fullname, username, path_to_profile_picture 
@@ -192,7 +203,8 @@ class User {
         return $stmt->fetchAll();
     }
 
-    public function createActivatedUser($fullname, $username, $email, $password, $roleId) {
+    public function createActivatedUser($fullname, $username, $email, $password, $roleId)
+    {
         $query = "INSERT INTO {$this->table} (fullname, username, email, bio, password, role_id, is_active)
               VALUES (:fullname, :username, :email, '', :password, :role_id, TRUE)
               RETURNING id";
@@ -209,14 +221,16 @@ class User {
         return (int)$stmt->fetchColumn();
     }
 
-    public function getRoleIdByName($roleName) {
+    public function getRoleIdByName($roleName)
+    {
         $stmt = $this->conn->prepare("SELECT id FROM roles WHERE name = :name");
         $stmt->execute([':name' => $roleName]);
         return $stmt->fetchColumn();
     }
 
     // --- FEATURE: Create User with Profile (Transaction) ---
-    public function createWithProfile($userData, $profileData, $roleName) {
+    public function createWithProfile($userData, $profileData, $roleName)
+    {
         $roleId = $this->getRoleIdByName($roleName);
         if (!$roleId) return ['success' => false, 'message' => 'Role tidak valid'];
 
@@ -232,12 +246,12 @@ class User {
             $stmt->execute([
                 ':fullname' => $userData['fullname'],
                 ':username' => $userData['username'],
-                ':email'    => $userData['email'],
-                ':bio'      => $userData['bio'],
+                ':email' => $userData['email'],
+                ':bio' => $userData['bio'],
                 ':password' => $hashed,
-                ':profile'  => $userData['path_to_profile_picture'],
-                ':is_active'=> $userData['is_active'],
-                ':role_id'  => $roleId
+                ':profile' => $userData['path_to_profile_picture'],
+                ':is_active' => $userData['is_active'],
+                ':role_id' => $roleId
             ]);
 
             $userId = (int)$stmt->fetchColumn();
@@ -276,7 +290,8 @@ class User {
     }
 
     // --- FEATURE: List Users (Complex Query) ---
-    public function getUsersWithProfiles($limit, $offset, $filters = []) {
+    public function getUsersWithProfiles($limit, $offset, $filters = [], $isAdmin = false, $userId = 0)
+    {
         $where = [];
         $params = [];
 
@@ -289,6 +304,13 @@ class User {
             // ILIKE untuk PostgreSQL, gunakan LIKE untuk MySQL
             $where[] = "(u.fullname ILIKE :q OR u.email ILIKE :q OR u.username ILIKE :q)";
             $params[':q'] = '%' . $filters['search'] . '%';
+        }
+
+        if ($isAdmin) {
+            if ($userId) {
+                $where[] = "u.id != :id";
+                $params[':id'] = $userId;
+            }
         }
 
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -336,7 +358,8 @@ class User {
     }
 
     // --- FEATURE: Update Role ---
-    public function updateUserRole($userId, $roleName) {
+    public function updateUserRole($userId, $roleName)
+    {
         $roleId = $this->getRoleIdByName($roleName);
         if (!$roleId) return ['success' => false, 'message' => 'Role tidak valid'];
 
@@ -401,7 +424,8 @@ class User {
     }
 
     // --- FEATURE: Toggle Active ---
-    public function toggleActiveStatus($userId) {
+    public function toggleActiveStatus($userId)
+    {
         // 1. Ambil ID dan is_active untuk memastikan barisnya ada
         $stmt = $this->conn->prepare("SELECT id, is_active FROM {$this->table} WHERE id = :id");
         $stmt->execute([':id' => $userId]);
@@ -435,7 +459,8 @@ class User {
     }
 
     // --- FEATURE: Delete User & Profiles ---
-    public function deleteUserAndProfiles($userId) {
+    public function deleteUserAndProfiles($userId)
+    {
         $this->conn->beginTransaction();
         try {
             // Delete profiles manual (opsional jika database tidak CASCADE)
@@ -458,7 +483,8 @@ class User {
     }
 
     // --- FEATURE: Promote to Alumni ---
-    public function promoteToAlumniBatch($userIds, $useEstimated, $manualYear) {
+    public function promoteToAlumniBatch($userIds, $useEstimated, $manualYear)
+    {
         $alumniId = $this->getRoleIdByName('Alumni');
         $mhsId = $this->getRoleIdByName('Mahasiswa');
 
@@ -519,7 +545,8 @@ class User {
         }
     }
 
-    public function updateEmailAndRole($userId, $newEmail, $newRoleId) {
+    public function updateEmailAndRole($userId, $newEmail, $newRoleId)
+    {
         $sql = "UPDATE users SET email = :email, role_id = :rid WHERE id = :uid";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([

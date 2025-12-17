@@ -27,23 +27,13 @@ class Community
     public function getRecommendedCommunities($userId)
     {
         $query = "
-            SELECT c.slug, c.name, c.path_to_thumbnail, c.is_public, COUNT(all_members.id) AS total_members
-            FROM {$this->table} c
-            -- Join untuk menghitung total member (hanya yang GRANTED)
-            LEFT JOIN community_members all_members ON c.id = all_members.community_id AND all_members.status = 'GRANTED'
-            
-            -- PERBAIKAN DISINI:
-            -- Tambahkan AND cm.status = 'GRANTED'
-            -- Artinya: Jika user ada di tabel tapi statusnya masih 'REQUEST', 
-            -- join ini akan gagal (return NULL), sehingga lolos dari filter WHERE cm.id IS NULL di bawah.
-            LEFT JOIN community_members cm ON c.id = cm.community_id 
+            SELECT v.* FROM v_community_header v
+            LEFT JOIN community_members cm ON v.id = cm.community_id 
                 AND cm.user_id = :user_id 
                 AND cm.status = 'GRANTED'
-
-            WHERE cm.id IS NULL -- Hanya ambil yang join-nya NULL (Belum GRANTED)
-            GROUP BY c.id, c.slug, c.name, c.path_to_thumbnail, c.is_public
-            ORDER BY total_members DESC
-            LIMIT 6;
+            WHERE cm.id IS NULL 
+            ORDER BY v.total_members DESC
+            LIMIT 6
         ";
 
         $stmt = $this->conn->prepare($query);
@@ -56,23 +46,14 @@ class Community
     {
         $searchTerm = "%" . $keyword . "%";
 
-        // Menggunakan ILIKE (PostgreSQL) agar pencarian tidak case-sensitive (a == A)
-        // LEFT JOIN pertama untuk menghitung total member
-        // LEFT JOIN kedua untuk mengecek apakah user yang sedang login sudah bergabung
         $query = "
             SELECT 
-                c.slug, 
-                c.name, 
-                c.path_to_thumbnail, 
-                c.is_public, 
-                COUNT(all_members.id) AS total_members,
-                MAX(CASE WHEN cm.user_id IS NOT NULL AND cm.status = 'GRANTED' THEN 1 ELSE 0 END) as is_joined
-            FROM {$this->table} c
-            LEFT JOIN community_members all_members ON c.id = all_members.community_id AND all_members.status = 'GRANTED'
-            LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.user_id = :user_id
-            WHERE c.name ILIKE :search
-            GROUP BY c.id, c.slug, c.name, c.path_to_thumbnail, c.is_public
-            ORDER BY total_members DESC
+                v.*, 
+                (CASE WHEN cm.user_id IS NOT NULL AND cm.status = 'GRANTED' THEN 1 ELSE 0 END) as is_joined
+            FROM v_community_header v
+            LEFT JOIN community_members cm ON v.id = cm.community_id AND cm.user_id = :user_id
+            WHERE v.name ILIKE :search
+            ORDER BY v.total_members DESC
             LIMIT 20
         ";
 
@@ -106,13 +87,8 @@ class Community
         }
 
         $query = "
-            SELECT 
-                c.id, c.slug, c.name, c.path_to_thumbnail, c.is_public, c.created_at,
-                COUNT(cm.id) AS total_members
-            FROM {$this->table} c
-            LEFT JOIN community_members cm ON c.id = cm.community_id AND cm.status = 'GRANTED'
-            WHERE c.name ILIKE :search
-            GROUP BY c.id
+            SELECT v.* FROM v_community_header v
+            WHERE v.name ILIKE :search
             ORDER BY {$orderBy}
             LIMIT :limit OFFSET :offset
         ";
@@ -161,12 +137,15 @@ class Community
 
     public function findBySlug($slug, $user_id)
     {
-        $query = "SELECT c.id, c.slug, c.name, c.path_to_thumbnail, c.is_public, c.about, COUNT(cm_all.id) AS total_members, cm.status AS user_membership_status, cm.role AS current_user_role
-                    FROM communities c 
-                    LEFT JOIN community_members cm_all ON cm_all.community_id = c.id AND cm_all.status = 'GRANTED'
-                    LEFT JOIN community_members cm ON cm.community_id = c.id AND cm.user_id = :user_id
-                    WHERE c.slug = :slug 
-                    GROUP BY c.id, c.slug, c.name, c.path_to_thumbnail, c.is_public, c.about, cm.status, cm.role";
+        $query = "
+            SELECT 
+                v.*, 
+                cm.status AS user_membership_status, 
+                cm.role AS current_user_role
+            FROM v_community_header v
+            LEFT JOIN community_members cm ON v.id = cm.community_id AND cm.user_id = :user_id
+            WHERE v.slug = :slug
+        ";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':user_id', $user_id);
         $stmt->bindParam(':slug', $slug);

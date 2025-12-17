@@ -143,6 +143,9 @@ function register_routes(Router $router)
     $router->addRoute('POST', 'api/posts/{id}/update', 'PostController@update',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa,Alumni,Mitra,Pakar', 'PostOwnerOrAdmin']
     );
+    $router->addRoute('POST', 'api/posts/{id}/pin', 'PostController@togglePin',
+        ['Authenticate', 'Role:Admin,Dosen,Mahasiswa']
+    );
     $router->addRoute('POST', 'api/posts/{id}/delete', 'PostController@delete',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa,Alumni,Mitra,Pakar', 'PostOwnerOrAdmin']
     );

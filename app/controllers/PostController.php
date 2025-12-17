@@ -180,6 +180,29 @@ class PostController {
         ResponseFormatter::success(null, 'Post created successfully');
     }
 
+    public function togglePin($id)
+    {
+        // 1. Cek apakah user adalah Admin
+        // Sesuai logic di show() atau indexByCommunity() Anda
+        $isAdmin = $_SESSION['user']['role_name'] === 'Admin';
+
+        if (!$isAdmin) {
+            ResponseFormatter::error('Hanya Admin yang dapat menyematkan postingan.', 403);
+            return;
+        }
+
+        $postModel = new Post();
+        $newState = $postModel->togglePinStatus($id);
+
+        if ($newState === null) {
+            ResponseFormatter::error('Gagal mengubah status pin atau postingan tidak ditemukan.', 500);
+            return;
+        }
+
+        $message = $newState ? 'Postingan berhasil disematkan' : 'Sematkan postingan dibatalkan';
+        ResponseFormatter::success(['is_pinned' => $newState], $message);
+    }
+
     public function show($id) {
         $postModel = new Post();
         $post = $postModel->getPostDetailById($id, $_SESSION['user_id']);
@@ -322,6 +345,7 @@ class PostController {
     {
         $formattedPosts = array_map(function ($post) use ($storageBaseUrl) {
             $post['is_liked_by_user'] = (bool)$post['is_liked_by_user'];
+            $post['is_pinned'] = (bool)($post['is_pinned'] ?? false);
 
             // Format Data User
             $post['user'] = [

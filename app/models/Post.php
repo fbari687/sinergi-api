@@ -20,25 +20,12 @@ class Post
     public function getAllPostInOneCommunity($community_id, $user_id, $limit = 10, $offset = 0, $search = null)
     {
         // Query dasar (tanpa ORDER BY dan LIMIT dulu)
-        $query = "SELECT p.id, p.description, p.path_to_media, p.is_edited, p.user_id, p.community_id, u.fullname, u.username, u.path_to_profile_picture, r.name AS role, p.created_at, p.updated_at, (pl_user.id IS NOT NULL) AS is_liked_by_user,
-            COALESCE(lc.like_count, 0) AS like_count,
-            COALESCE(cc.comment_count, 0) AS comment_count
-            FROM {$this->table} p
-            JOIN users u ON p.user_id = u.id
-            JOIN roles r ON u.role_id = r.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) AS like_count
-                FROM post_likes
-                GROUP BY post_id
-            ) AS lc ON p.id = lc.post_id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) AS comment_count
-                FROM comments
-                GROUP BY post_id
-            ) AS cc ON p.id = cc.post_id
-            LEFT JOIN post_likes pl_user ON p.id = pl_user.post_id 
-            AND pl_user.user_id = :currentUserId
-            WHERE p.community_id = :community_id";
+        $query = "SELECT v.*, 
+                (pl_user.id IS NOT NULL) AS is_liked_by_user
+                FROM v_posts_header v
+                LEFT JOIN post_likes pl_user ON v.id = pl_user.post_id 
+                AND pl_user.user_id = :currentUserId
+                WHERE v.community_id = :community_id";
 
         // 1. Logika Pencarian Dinamis
         if ($search) {
@@ -71,25 +58,12 @@ class Post
     public function getAllPostInHome($user_id, $limit = 10, $offset = 0, $search = null)
     {
         // Query Dasar
-        $query = "SELECT p.id, p.description, p.path_to_media, p.is_edited, p.user_id, u.fullname, u.username, u.path_to_profile_picture, r.name AS role, p.created_at, p.updated_at, (pl_user.id IS NOT NULL) AS is_liked_by_user,
-            COALESCE(lc.like_count, 0) AS like_count,
-            COALESCE(cc.comment_count, 0) AS comment_count
-            FROM {$this->table} p
-            JOIN users u ON p.user_id = u.id
-            JOIN roles r ON u.role_id = r.id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) AS like_count
-                FROM post_likes
-                GROUP BY post_id
-            ) AS lc ON p.id = lc.post_id
-            LEFT JOIN (
-                SELECT post_id, COUNT(*) AS comment_count
-                FROM comments
-                GROUP BY post_id
-            ) AS cc ON p.id = cc.post_id
-            LEFT JOIN post_likes pl_user ON p.id = pl_user.post_id 
-            AND pl_user.user_id = :currentUserId        
-            WHERE p.community_id IS NULL";
+        $query = "SELECT v.*, 
+              (pl_user.id IS NOT NULL) AS is_liked_by_user
+              FROM v_posts_header v
+              LEFT JOIN post_likes pl_user ON v.id = pl_user.post_id 
+              AND pl_user.user_id = :currentUserId
+              WHERE v.community_id IS NULL";
 
         // --- 1. LOGIKA PENCARIAN (TAMBAHAN BARU) ---
         if ($search) {
@@ -99,7 +73,7 @@ class Post
         // -------------------------------------------
 
         // Tambahkan Order dan Limit
-        $query .= " ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
+        $query .= " ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT :limit OFFSET :offset";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':currentUserId', $user_id);
@@ -119,6 +93,24 @@ class Post
         return $stmt->fetchAll();
     }
 
+    public function togglePinStatus($id)
+    {
+        // Gunakan NOT is_pinned langsung di SQL.
+        // RETURNING is_pinned digunakan untuk mendapatkan hasil akhirnya (khusus PostgreSQL)
+        $query = "UPDATE {$this->table} SET is_pinned = NOT is_pinned WHERE id = :id RETURNING is_pinned";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $id);
+
+        if ($stmt->execute()) {
+            $result = $stmt->fetchColumn();
+            // Kembalikan sebagai boolean asli PHP
+            return filter_var($result, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return null;
+    }
+
     public function findById($id)
     {
         $query = "SELECT * FROM {$this->table} WHERE id = :id";
@@ -130,26 +122,10 @@ class Post
 
     public function getPostDetailById($post_id, $user_id)
     {
-        $query = "SELECT p.id, p.description, p.path_to_media, p.community_id, p.user_id, u.fullname, u.username, u.path_to_profile_picture, r.name AS role, p.created_at, p.updated_at, (pl_user.id IS NOT NULL) AS is_liked_by_user,
-                COALESCE(lc.like_count, 0) AS like_count,
-                COALESCE(cc.comment_count, 0) AS comment_count
-                FROM {$this->table} p
-                JOIN users u ON p.user_id = u.id
-                JOIN roles r ON u.role_id = r.id
-                LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS like_count
-                    FROM post_likes
-                    GROUP BY post_id
-                ) AS lc ON p.id = lc.post_id
-                LEFT JOIN (
-                    SELECT post_id, COUNT(*) AS comment_count
-                    FROM comments
-                    GROUP BY post_id
-                ) AS cc ON p.id = cc.post_id
-                LEFT JOIN post_likes pl_user ON p.id = pl_user.post_id 
-                AND pl_user.user_id = :currentUserId        
-                WHERE p.id = :post_id
-                ";
+        $query = "SELECT v.*, (pl_user.id IS NOT NULL) AS is_liked_by_user
+              FROM v_posts_header v
+              LEFT JOIN post_likes pl_user ON v.id = pl_user.post_id AND pl_user.user_id = :currentUserId
+              WHERE v.id = :post_id";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':post_id', $post_id);
