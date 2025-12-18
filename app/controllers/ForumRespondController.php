@@ -7,6 +7,8 @@ use app\helpers\ResponseFormatter;
 use app\models\Forum;
 use app\models\ForumRespond;
 require BASE_PATH . '/vendor/autoload.php';
+
+use app\services\ModerationService;
 use HTMLPurifier;
 use HTMLPurifier_Config;
 
@@ -75,6 +77,26 @@ class ForumRespondController {
         // parent_id opsional. Jika null = Answer, Jika isi = Reply
         $parentId = $data['parent_id'] == 'null' ? null : $data['parent_id'];
 
+        $config = HTMLPurifier_Config::createDefault();
+        $purifier = new HTMLPurifier($config);
+        $safeHtmlMessage = $purifier->purify($data['message']);
+
+        $plainText = strip_tags($safeHtmlMessage);
+        $plainText = html_entity_decode($plainText);
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
+
+        if (!empty($plainText)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($plainText);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
         if (isset($_FILES['media']) && $_FILES['media']['error'] === 0) {
             $uploadedPath = FileHelper::upload(
                 $_FILES['media'],
@@ -88,9 +110,6 @@ class ForumRespondController {
             }
         }
 
-        $config = HTMLPurifier_Config::createDefault();
-        $purifier = new HTMLPurifier($config);
-        $safeHtmlMessage = $purifier->purify($data['message']);
 
         $respondModel = new ForumRespond();
         $id = $respondModel->create(
@@ -177,6 +196,22 @@ class ForumRespondController {
         $config = HTMLPurifier_Config::createDefault();
         $purifier = new HTMLPurifier($config);
         $safeHtmlMessage = $purifier->purify($data['message']);
+
+        $plainText = strip_tags($safeHtmlMessage);
+        $plainText = html_entity_decode($plainText);
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
+
+        if (!empty($plainText)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($plainText);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
 
         $finalMediaPath = $forumRespondData['path_to_media'];
 

@@ -1,10 +1,12 @@
 <?php
+
 namespace app\middleware;
 
 use app\helpers\ResponseFormatter;
 use app\models\User;
 
-class AuthenticateMiddleware {
+class AuthenticateWithoutActiveMiddleware
+{
     public function handle() {
         if (!isset($_SESSION['user_id'])) {
             ResponseFormatter::error('Unauthorized', 401);
@@ -30,14 +32,6 @@ class AuthenticateMiddleware {
             $user['profile_picture'] = $storageBaseUrl . $user['path_to_profile_picture'];
             unset($user['path_to_profile_picture']);
             $_SESSION['user'] = (array) $user;
-        } else {
-            $userModel = new User();
-            // Anda perlu membuat method findByIdWithRole() di model User
-            $user = $userModel->findByIdWithRole($_SESSION['user_id']);
-            if ($user['is_active'] === false) {
-                session_destroy();
-                ResponseFormatter::error('This account has been disabled', 403);
-            }
         }
     }
 }

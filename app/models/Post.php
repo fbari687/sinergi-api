@@ -30,11 +30,11 @@ class Post
         // 1. Logika Pencarian Dinamis
         if ($search) {
             // Cari berdasarkan deskripsi postingan ATAU username pembuat
-            $query .= " AND (p.description ILIKE :search OR u.username ILIKE :search)";
+            $query .= " AND (v.description ILIKE :search OR v.username ILIKE :search)";
         }
 
         // 2. Tambahkan Order dan Limit setelah filter search
-        $query .= " ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
+        $query .= " ORDER BY v.created_at DESC LIMIT :limit OFFSET :offset";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':currentUserId', $user_id);
@@ -68,12 +68,12 @@ class Post
         // --- 1. LOGIKA PENCARIAN (TAMBAHAN BARU) ---
         if ($search) {
             // Cari deskripsi ATAU username
-            $query .= " AND (p.description ILIKE :search OR u.username ILIKE :search)";
+            $query .= " AND (v.description ILIKE :search OR v.username ILIKE :search)";
         }
         // -------------------------------------------
 
         // Tambahkan Order dan Limit
-        $query .= " ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT :limit OFFSET :offset";
+        $query .= " ORDER BY v.is_pinned DESC, v.created_at DESC LIMIT :limit OFFSET :offset";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':currentUserId', $user_id);

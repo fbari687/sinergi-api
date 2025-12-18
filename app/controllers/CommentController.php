@@ -6,6 +6,7 @@ use app\helpers\ResponseFormatter;
 use app\models\Comment;
 use app\models\Notification;
 use app\models\Post;
+use app\services\ModerationService;
 
 class CommentController {
 
@@ -77,11 +78,25 @@ class CommentController {
             return;
         }
 
+        $content = htmlspecialchars($data['content']);
+
+        if (!empty($content)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($content);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
         $commentModel = new Comment();
 
         $dataComment = [
             'post_id' => $postId,
-            'content' => strip_tags($data['content']),
+            'content' => $content,
             'user_id' => $_SESSION['user_id'],
             'parent_id' => null
         ];
@@ -142,6 +157,20 @@ class CommentController {
             ResponseFormatter::error('Post not found', 404);
             return;
         }
+
+        $content = htmlspecialchars($data['content']);
+        if (!empty($content)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($content);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
 
         $dataComment = [
             'post_id' => $commentData['post_id'],

@@ -16,6 +16,7 @@ require BASE_PATH . '/vendor/autoload.php';
 use app\models\Post;
 use app\models\Report;
 use app\models\User;
+use app\services\ModerationService;
 use HTMLPurifier;
 use HTMLPurifier_Config;
 use Exception;
@@ -72,6 +73,35 @@ class CommunityController
         $config = HTMLPurifier_Config::createDefault();
         $purifier = new HTMLPurifier($config);
         $safeHtmlAbout = $purifier->purify($data['about']);
+
+        if (!empty($data['name'])) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($data['name']);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
+        $plainText = strip_tags($safeHtmlAbout);
+        $plainText = html_entity_decode($plainText);
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
+
+        if (!empty($plainText)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($plainText);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
 
         $uploadedPath = FileHelper::upload(
             $_FILES['thumbnail'],
@@ -139,6 +169,34 @@ class CommunityController
         $config = HTMLPurifier_Config::createDefault();
         $purifier = new HTMLPurifier($config);
         $safeHtmlAbout = $purifier->purify($data['about']);
+
+        if (!empty($data['name'])) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($data['name']);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
+        $plainText = strip_tags($safeHtmlAbout);
+        $plainText = html_entity_decode($plainText);
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
+
+        if (!empty($plainText)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($plainText);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
 
         // 3. Logic Thumbnail
         $finalPath = $communityData['path_to_thumbnail']; // Default pakai path lama

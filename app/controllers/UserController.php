@@ -5,6 +5,7 @@ namespace app\controllers;
 use app\helpers\FileHelper;
 use app\helpers\ResponseFormatter;
 use app\models\User;
+use app\services\ModerationService;
 
 class UserController
 {
@@ -60,7 +61,19 @@ class UserController
         }
 
         // 2. Handle Bio
-        $newBio = isset($data['bio']) ? strip_tags($data['bio']) : $currentUser['bio'];
+        $newBio = isset($data['bio']) ? htmlspecialchars($data['bio']) : $currentUser['bio'];
+
+        if (!empty($newBio)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($newBio);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
 
         // 3. Handle Foto Profil
         $uploadedPath = $currentUser['path_to_profile_picture']; // Default pakai yang lama

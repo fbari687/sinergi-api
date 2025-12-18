@@ -564,57 +564,7 @@ class AuthController
 
         ResponseFormatter::success(null, 'Logout successful');
     }
-
-//    public function activateExternalAccount()
-//    {
-//        // Ambil body JSON
-//        $input = json_decode(file_get_contents('php://input'), true);
-//        $token = $input['token'] ?? null;
-//
-//        if (!$token) {
-//            ResponseFormatter::error('Token tidak ditemukan.', 400);
-//            return;
-//        }
-//
-//        $requestModel = new AccountRequest();
-//        $request = $requestModel->findByToken($token);
-//
-//        if (!$request) {
-//            ResponseFormatter::error('Token tidak valid.', 404);
-//            return;
-//        }
-//
-//        // Pastikan status masih APPROVED, belum ACTIVATED
-//        if ($request['status'] !== 'APPROVED') {
-//            // Bisa sudah ACTIVATED, REJECTED, atau PENDING
-//            ResponseFormatter::error('Permintaan akun ini tidak dapat diaktifkan.', 400);
-//            return;
-//        }
-//
-//        // Cek expiry token (kalau ada)
-//        if (!empty($request['token_expires_at'])) {
-//            $now = new \DateTimeImmutable('now');
-//            $expiresAt = new \DateTimeImmutable($request['token_expires_at']);
-//
-//            if ($now > $expiresAt) {
-//                ResponseFormatter::error('Token aktivasi sudah kadaluarsa.', 400);
-//                return;
-//            }
-//        }
-//
-//        // Kalau semua valid: update status menjadi ACTIVATED
-//        if (!$requestModel->markActivated((int) $request['id'])) {
-//            ResponseFormatter::error('Gagal mengaktifkan akun.', 500);
-//            return;
-//        }
-//
-//        // Di sini kamu bisa lakukan hal lain kalau mau, misalnya:
-//        // - pastikan user masih is_active = TRUE
-//        // - catat log aktivasi, dsb.
-//
-//        ResponseFormatter::success(null, 'Akun Anda berhasil diaktifkan. Silakan login menggunakan email dan password Anda.');
-//    }
-
+    
     public function activateExternalAccount()
     {
         $input = json_decode(file_get_contents('php://input'), true);

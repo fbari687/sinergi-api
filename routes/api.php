@@ -10,10 +10,10 @@ function register_routes(Router $router)
     $router->addRoute('GET', 'api/captcha', 'CaptchaController@generate');
     $router->addRoute('POST', 'api/login', 'AuthController@login');
     $router->addRoute('POST', 'api/logout', 'AuthController@logout',
-        ['Authenticate']
+        ['AuthenticateWithoutActive']
     );
     $router->addRoute('GET', 'api/me', 'AuthController@me',
-        ['Authenticate']
+        ['AuthenticateWithoutActive']
     );
 
     $router->addRoute('POST', 'api/forgot-password/request', 'AuthController@requestForgotPasswordOtp');

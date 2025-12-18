@@ -11,6 +11,7 @@ require BASE_PATH . '/vendor/autoload.php';
 
 use app\models\ForumRespond;
 use app\models\Report;
+use app\services\ModerationService;
 use HTMLPurifier;
 use HTMLPurifier_Config;
 
@@ -127,6 +128,38 @@ class ForumController {
             ResponseFormatter::error('Community not found', 404);
         }
 
+        $config = HTMLPurifier_Config::createDefault();
+        $purifier = new HTMLPurifier($config);
+        $safeHtmlDescription = $purifier->purify($data['description']);
+
+        if (!empty($data['title'])) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($data['title']);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
+        $plainText = strip_tags($safeHtmlDescription);
+        $plainText = html_entity_decode($plainText);
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
+
+        if (!empty($plainText)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($plainText);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
         if (isset($_FILES['media']) && $_FILES['media']['error'] === 0) {
             $uploadedPath = FileHelper::upload(
                 $_FILES['media'],
@@ -139,10 +172,6 @@ class ForumController {
                 ResponseFormatter::error('Failed to upload media', 500);
             }
         }
-
-        $config = HTMLPurifier_Config::createDefault();
-        $purifier = new HTMLPurifier($config);
-        $safeHtmlDescription = $purifier->purify($data['description']);
 
         $forumModel = new Forum();
         $forumId = $forumModel->create(
@@ -180,6 +209,34 @@ class ForumController {
         $config = HTMLPurifier_Config::createDefault();
         $purifier = new HTMLPurifier($config);
         $safeHtmlDescription = $purifier->purify($data['description']);
+
+        if (!empty($data['title'])) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($data['title']);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
+
+        $plainText = strip_tags($safeHtmlDescription);
+        $plainText = html_entity_decode($plainText);
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
+
+        if (!empty($plainText)) {
+            $moderation = new ModerationService();
+            $result = $moderation->check($plainText);
+
+            if ($result['flagged']) {
+                ResponseFormatter::error(
+                    'Konten Anda terindikasi melanggar kebijakan etika kampus. Silakan perbaiki dan coba kembali.',
+                    422
+                );
+            }
+        }
 
         // 2. Logika Media (Gambar)
 

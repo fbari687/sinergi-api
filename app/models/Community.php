@@ -69,20 +69,20 @@ class Community
         $searchTerm = "%" . $keyword . "%";
 
         // Tentukan Sorting
-        $orderBy = "c.created_at DESC"; // Default
+        $orderBy = "v.created_at DESC"; // Default
         switch ($sort) {
             case 'oldest':
-                $orderBy = "c.created_at ASC";
+                $orderBy = "v.created_at ASC";
                 break;
             case 'most_members':
-                $orderBy = "total_members DESC";
+                $orderBy = "v.total_members DESC";
                 break;
             case 'least_members':
-                $orderBy = "total_members ASC";
+                $orderBy = "v.total_members ASC";
                 break;
             case 'newest':
             default:
-                $orderBy = "c.created_at DESC";
+                $orderBy = "v.created_at DESC";
                 break;
         }
 
