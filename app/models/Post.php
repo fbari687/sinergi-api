@@ -57,7 +57,6 @@ class Post
     // UPDATE: Menambahkan parameter limit & offset
     public function getAllPostInHome($user_id, $limit = 10, $offset = 0, $search = null)
     {
-        // Query Dasar
         $query = "SELECT v.*, 
               (pl_user.id IS NOT NULL) AS is_liked_by_user
               FROM v_posts_header v

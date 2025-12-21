@@ -13,14 +13,13 @@ class ForumRespond {
     }
 
     public function create($userId, $forumId, $message, $parentId = null, $pathToMedia = null) {
-        $query = "INSERT INTO {$this->table} (user_id, forum_id, message, parent_id, path_to_media) 
-                  VALUES (:user_id, :forum_id, :message, :parent_id, :path_to_media) RETURNING id";
+        $query = "INSERT INTO {$this->table} (user_id, forum_id, message, path_to_media) 
+                  VALUES (:user_id, :forum_id, :message, :path_to_media) RETURNING id";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':user_id', $userId);
         $stmt->bindParam(':forum_id', $forumId);
         $stmt->bindParam(':message', $message);
-        $stmt->bindParam(':parent_id', $parentId);
         $stmt->bindParam(':path_to_media', $pathToMedia);
 
         if ($stmt->execute()) {
@@ -69,7 +68,6 @@ class ForumRespond {
               JOIN users u ON fr.user_id = u.id
               LEFT JOIN roles r ON u.role_id = r.id
               WHERE fr.forum_id = :forum_id 
-                AND fr.parent_id IS NULL 
               ORDER BY {$orderBy}
               LIMIT :limit OFFSET :offset";
 
@@ -85,7 +83,7 @@ class ForumRespond {
     }
 
     public function countByForumId($forumId) {
-        $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE forum_id = :forum_id AND parent_id IS NULL";
+        $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE forum_id = :forum_id";
         $stmt = $this->conn->prepare($query);
         $stmt->bindValue(':forum_id', $forumId);
         $stmt->execute();
@@ -93,20 +91,20 @@ class ForumRespond {
         return $result ? $result['total'] : 0;
     }
 
-    public function getRepliesByParentId($parentId) {
-        $query = "SELECT 
-                    fr.*,
-                    u.fullname, u.username, u.path_to_profile_picture as profile_picture
-                  FROM {$this->table} fr
-                  JOIN users u ON fr.user_id = u.id
-                  WHERE fr.parent_id = :parent_id
-                  ORDER BY fr.created_at ASC";
-
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':parent_id', $parentId);
-        $stmt->execute();
-        return $stmt->fetchAll();
-    }
+//    public function getRepliesByParentId($parentId) {
+//        $query = "SELECT
+//                    fr.*,
+//                    u.fullname, u.username, u.path_to_profile_picture as profile_picture
+//                  FROM {$this->table} fr
+//                  JOIN users u ON fr.user_id = u.id
+//                  WHERE fr.parent_id = :parent_id
+//                  ORDER BY fr.created_at ASC";
+//
+//        $stmt = $this->conn->prepare($query);
+//        $stmt->bindParam(':parent_id', $parentId);
+//        $stmt->execute();
+//        return $stmt->fetchAll();
+//    }
 
     public function markAsAccepted($respondId, $forumId) {
         try {

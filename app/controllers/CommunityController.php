@@ -24,12 +24,13 @@ use Exception;
 class CommunityController
 {
 
-    public function index()
-    {
-        $communityModel = new Community();
-        $communities = $communityModel->getAll();
-        ResponseFormatter::Success($communities, 'Communities fetched successfully');
-    }
+    // ga pake
+//    public function index()
+//    {
+//        $communityModel = new Community();
+//        $communities = $communityModel->getAll();
+//        ResponseFormatter::Success($communities, 'Communities fetched successfully');
+//    }
 
     public function show($slug)
     {

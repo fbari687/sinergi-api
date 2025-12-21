@@ -45,11 +45,11 @@ class ForumRespondController {
 
             // Ambil Komentar/Reply untuk jawaban ini (Nested)
             // Note: Reply biasanya tidak dipagination di level ini, jadi tetap ambil semua
-            $replies = $respondModel->getRepliesByParentId($ans['id']);
-            $ans['replies'] = array_map(function($r) use ($config) {
-                $r['profile_picture_url'] = $r['profile_picture'] ? $config['storage_url'] . $r['profile_picture'] : null;
-                return $r;
-            }, $replies);
+//            $replies = $respondModel->getRepliesByParentId($ans['id']);
+//            $ans['replies'] = array_map(function($r) use ($config) {
+//                $r['profile_picture_url'] = $r['profile_picture'] ? $config['storage_url'] . $r['profile_picture'] : null;
+//                return $r;
+//            }, $replies);
 
             return $ans;
         }, $answers);

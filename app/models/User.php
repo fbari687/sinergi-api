@@ -302,7 +302,7 @@ class User
 
         if (!empty($filters['search'])) {
             // ILIKE untuk PostgreSQL, gunakan LIKE untuk MySQL
-            $where[] = "(u.fullname ILIKE :q OR u.email ILIKE :q OR u.username ILIKE :q)";
+            $where[] = "(u.fullname ILIKE :q OR u.username ILIKE :q)";
             $params[':q'] = '%' . $filters['search'] . '%';
         }
 

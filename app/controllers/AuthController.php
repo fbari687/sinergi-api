@@ -36,7 +36,7 @@ class AuthController
             ResponseFormatter::error('Email domain not allowed', 400);
         }
 
-        if (strlen($data['password']) < 8) {
+        if (strlen($data['password']) === 8) {
             ResponseFormatter::error('Password must be at least 8 characters long', 400);
         }
 
@@ -564,7 +564,7 @@ class AuthController
 
         ResponseFormatter::success(null, 'Logout successful');
     }
-    
+
     public function activateExternalAccount()
     {
         $input = json_decode(file_get_contents('php://input'), true);

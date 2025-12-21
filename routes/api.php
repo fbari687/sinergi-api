@@ -48,9 +48,9 @@ function register_routes(Router $router)
     $router->addRoute('POST', 'api/communities', 'CommunityController@store',
         ['Authenticate', 'Role:Admin,Dosen,Mahasiswa']
     );
-    $router->addRoute('GET', 'api/communities', 'CommunityController@index',
-        ['Authenticate', 'Role:Admin,Dosen,Mahasiswa']
-    );
+//    $router->addRoute('GET', 'api/communities', 'CommunityController@index',
+//        ['Authenticate', 'Role:Admin,Dosen,Mahasiswa']
+//    );
     $router->addRoute('GET', 'api/communities/all', 'CommunityController@getAllCommunities',
         ['Authenticate', 'Role:Admin']
     );

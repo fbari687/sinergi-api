@@ -16,14 +16,15 @@ class Community
         $this->conn = Database::getInstance()->getConnection();
     }
 
-    public function getAll()
-    {
-        $query = "SELECT slug, name, path_to_thumbnail, is_public, about FROM {$this->table}";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        return $stmt->fetchAll();
-    }
+//    public function getAll()
+//    {
+//        $query = "SELECT slug, name, path_to_thumbnail, is_public, about FROM {$this->table}";
+//        $stmt = $this->conn->prepare($query);
+//        $stmt->execute();
+//        return $stmt->fetchAll();
+//    }
 
+    // pake
     public function getRecommendedCommunities($userId)
     {
         $query = "
@@ -42,6 +43,7 @@ class Community
         return $stmt->fetchAll();
     }
 
+    // pake
     public function searchByName($userId, $keyword)
     {
         $searchTerm = "%" . $keyword . "%";
@@ -64,6 +66,7 @@ class Community
         return $stmt->fetchAll();
     }
 
+    // pake
     public function getAllWithPagination($keyword = '', $sort = 'newest', $limit = 10, $offset = 0)
     {
         $searchTerm = "%" . $keyword . "%";
@@ -170,13 +173,13 @@ class Community
         return $stmt->execute();
     }
 
-    public function deleteById($id)
-    {
-        $query = "DELETE FROM {$this->table} WHERE id = :id";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $id);
-        return $stmt->execute();
-    }
+//    public function deleteById($id)
+//    {
+//        $query = "DELETE FROM {$this->table} WHERE id = :id";
+//        $stmt = $this->conn->prepare($query);
+//        $stmt->bindParam(':id', $id);
+//        return $stmt->execute();
+//    }
 
     public function update($slug, array $dataCommunity)
     {

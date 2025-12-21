@@ -16,6 +16,7 @@ class AccountRequest
     }
 
     // 1. Create Request Baru
+    // pake
     public function create($requesterId, $communityId, $data)
     {
         $query = "INSERT INTO {$this->table} 
@@ -39,6 +40,7 @@ class AccountRequest
     }
 
     // 2. Ambil semua request pending (Untuk Admin Sinergi)
+    // pake
     public function getAllPending()
     {
         $query = "SELECT ar.*, c.name as community_name, u.fullname as requester_name 
@@ -64,6 +66,7 @@ class AccountRequest
     }
 
     // 3. Cari berdasarkan ID
+    // pake
     public function findById($id)
     {
         $query = "SELECT * FROM {$this->table} WHERE id = :id";
@@ -80,6 +83,7 @@ class AccountRequest
     }
 
     // 4. Update Status & Token (Saat Approve)
+    // pake
     public function approve($id, $token)
     {
         $query = "UPDATE {$this->table} 
@@ -93,6 +97,7 @@ class AccountRequest
     }
 
     // 5. Reject Request
+    // pake
     public function reject($id)
     {
         $query = "UPDATE {$this->table} SET status = 'REJECTED' WHERE id = :id";
@@ -102,6 +107,7 @@ class AccountRequest
     }
 
     // 6. Cek apakah email sedang dalam proses request (mencegah duplikat request)
+    // pake
     public function isEmailPending($email)
     {
         $query = "SELECT id FROM {$this->table} WHERE email = :email AND status = 'PENDING'";
@@ -111,6 +117,7 @@ class AccountRequest
         return $stmt->fetchColumn();
     }
 
+    // pake
     public function findByToken(string $token)
     {
         $query = "SELECT * FROM {$this->table} WHERE activation_token = :token LIMIT 1";
@@ -126,14 +133,15 @@ class AccountRequest
         return $result ?: null;
     }
 
-    public function markActivated(int $id): bool
-    {
-        $query = "UPDATE {$this->table} SET status = 'ACTIVATED' WHERE id = :id";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $id, \PDO::PARAM_INT);
-        return $stmt->execute();
-    }
+//    public function markActivated(int $id): bool
+//    {
+//        $query = "UPDATE {$this->table} SET status = 'ACTIVATED' WHERE id = :id";
+//        $stmt = $this->conn->prepare($query);
+//        $stmt->bindParam(':id', $id, \PDO::PARAM_INT);
+//        return $stmt->execute();
+//    }
 
+    // pake
     public function updateStatus($id, $status) {
         $query = "UPDATE {$this->table} SET status = :status WHERE id = :id";
         $stmt = $this->conn->prepare($query);

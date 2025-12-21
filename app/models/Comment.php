@@ -12,6 +12,7 @@ class Comment {
         $this->conn = Database::getInstance()->getConnection();
     }
 
+    // pake
     public function create($data) {
         $query = "INSERT INTO {$this->table} (post_id, user_id, parent_id, content) VALUES (:post_id, :user_id, :parent_id, :content)";
         $stmt = $this->conn->prepare($query);
@@ -22,6 +23,7 @@ class Comment {
         return $stmt->execute();
     }
 
+    // pake
     public function findPostComments($postId) {
         // Tambahkan subquery: (SELECT COUNT(*) FROM comments c2 WHERE c2.parent_id = c.id) as reply_count
         $query = "SELECT c.id, c.content, c.user_id, c.post_id, c.created_at, 
@@ -39,6 +41,7 @@ class Comment {
         return $stmt->fetchAll();
     }
 
+    // pake
     public function findCommentReplies($parentId) {
         // Tambahkan juga reply_count di sini untuk balasan bertingkat (opsional, tapi disarankan)
         $query = "SELECT c.id, c.content, c.user_id, c.post_id, c.created_at, 
@@ -56,6 +59,7 @@ class Comment {
         return $stmt->fetchAll();
     }
 
+    // pake
     public function findById($id) {
         $query = "SELECT * FROM {$this->table} WHERE id = :id";
         $stmt = $this->conn->prepare($query);
@@ -64,6 +68,7 @@ class Comment {
         return $stmt->fetch();
     }
 
+    // pake
     public function delete($id): bool {
         $query = "DELETE FROM {$this->table} WHERE id = :id";
         $stmt = $this->conn->prepare($query);
@@ -71,6 +76,7 @@ class Comment {
         return $stmt->execute();
     }
 
+    // pake
     public function getCommentIdsByPostId(int $postId): array
     {
         $query = "SELECT id FROM {$this->table} WHERE post_id = :post_id";

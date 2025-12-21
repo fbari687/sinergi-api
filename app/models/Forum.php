@@ -59,7 +59,7 @@ class Forum {
         $query = "SELECT 
                     f.id, f.title, f.description, f.created_at, f.is_edited,
                     u.id as user_id, u.fullname, u.username, u.path_to_profile_picture as profile_picture,
-                    (SELECT COUNT(*) FROM forums_responds fr WHERE fr.forum_id = f.id AND fr.parent_id IS NULL) as answer_count
+                    (SELECT COUNT(*) FROM forums_responds fr WHERE fr.forum_id = f.id) as answer_count
                   FROM {$this->table} f
                   JOIN communities c ON f.community_id = c.id
                   JOIN users u ON f.user_id = u.id
